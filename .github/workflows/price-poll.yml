@@ -1,0 +1,47 @@
+# CoinGecko 시세를 5분마다 폴링해 Supabase price_snapshots에 적재한다.
+# 워커는 POLL_ONCE=1 모드로 1회 실행 후 종료. cron이 5분 간격으로 재트리거한다.
+
+name: price poller
+
+on:
+  schedule:
+    # 매 5분. 실제 발화 시각은 GitHub Actions 부하에 따라 수 분 지연될 수 있다.
+    - cron: '*/5 * * * *'
+  workflow_dispatch: # Actions 탭에서 "Run workflow"로 수동 실행
+
+permissions:
+  # GITHUB_TOKEN 권한을 최소(read)로 제한. 본 워크플로는 저장소 쓰기가 필요 없다.
+  contents: read
+
+concurrency:
+  # 폴러가 겹쳐 실행되어 중복 적재되는 일을 막는다. 진행 중인 건 끊지 않는다.
+  group: price-poll
+  cancel-in-progress: false
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: worker/requirements.txt
+
+      - name: Install deps
+        run: pip install -r worker/requirements.txt
+
+      - name: Run poller (1회 적재)
+        working-directory: worker
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          POLL_SYMBOLS: BTC,ETH,SOL
+          POLL_ONCE: '1'
+          WORKER_ENV: github-actions
+        run: python price_poller.py
