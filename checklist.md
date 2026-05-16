@@ -72,15 +72,43 @@
 
 ---
 
-## Stage 2 · 캔들 수집 + 기술적 지표 + 공포·탐욕 지수
+## Stage 2 · 캔들 수집 + 기술적 지표 + 공포·탐욕 지수 ★ 현재 진행
 
-- [ ] 캔들 데이터 테이블 설계 (timeframe별)
-- [ ] 워커에서 OHLCV 수집 잡 구현
-- [ ] RSI 계산 모듈 (Python, worker)
-- [ ] MACD 계산 모듈 (Python, worker)
-- [ ] 공포·탐욕 지수 API 연동 및 적재 (Alternative.me, 무료)
-- [ ] 프론트 차트 컴포넌트 (예: lightweight-charts)
-- [ ] 지표 오버레이 UI
+> 설계 결정 (2026-05-17)
+> - **timeframe** — 시작은 `1d` 일봉만 적재. 스키마는 `1m/5m/15m/1h/4h/1d` 허용으로 확장 가능.
+> - **저장 기간** — 무제한 누적. 매일 최신 1건씩 UPSERT (UNIQUE로 중복 방지).
+> - **OHLCV 출처** — CoinGecko `/coins/{id}/ohlc` (volume 미제공, close 위주 지표 계산엔 충분).
+> - **공포·탐욕 출처** — Alternative.me 무료 API (CMC Pro key 미발급으로 1차 폴백).
+> - **시작 순서** — 2-A → 2-C(독립적·가벼움) → 2-B → 2-D → 2-E.
+
+### 2-A. 데이터 모델 ★ 진행 중
+- [x] `worker/migrations/0002_candles.sql` 작성 — candles 테이블 (symbol, timeframe, open_time, OHLC + volume nullable), UNIQUE(symbol, timeframe, open_time), CHECK 제약, RLS 2정책
+- [ ] **사용자 액션** — Supabase SQL Editor에서 `0002_candles.sql` 실행, 테이블·정책 생성 확인
+
+### 2-B. OHLCV 수집 잡 (워커)
+- [ ] CoinGecko `/coins/{id}/ohlc?days=N` 클라이언트 함수 작성
+- [ ] `worker/candle_poller.py` — 일 1회 잡, BTC/ETH/SOL 일봉 적재 (UPSERT)
+- [ ] GitHub Actions cron 또는 기존 워크플로에 통합 (별도 워크플로 권장 — 일 1회면 충분)
+- [ ] 로컬 1회 수동 실행 → Supabase 적재 확인
+
+### 2-C. 공포·탐욕 지수
+- [ ] `worker/migrations/0003_fear_greed.sql` — fear_greed 테이블 (id, value, classification, captured_at) + RLS
+- [ ] `worker/fear_greed_poller.py` — Alternative.me `/fng/?limit=1` 호출, 일 1회 적재
+- [ ] GitHub Actions cron 또는 통합 잡
+- [ ] 프론트 — 헤더 또는 SummaryBox에 현재값 + 분류(Extreme Fear 등) 표시
+
+### 2-D. RSI/MACD 계산
+- [ ] 계산 정책 결정 — 사전 계산 후 indicators 테이블 저장 vs view로 매번 계산. 일봉 빈도 낮으니 **사전 계산** 권장
+- [ ] `worker/migrations/0004_indicators.sql` — indicators 테이블 (symbol, timeframe, computed_at, rsi_14, macd, macd_signal, macd_hist)
+- [ ] `worker/indicators.py` — pandas/numpy로 RSI(14)·MACD(12/26/9) 계산
+- [ ] 캔들 적재 직후 indicators 갱신 (체이닝 또는 별도 잡)
+
+### 2-E. 프론트 차트 + 지표 UI
+- [ ] 차트 라이브러리 선택 — lightweight-charts(전문) vs recharts(범용). 캔들·라인·오버레이 모두 필요하면 lightweight-charts
+- [ ] `frontend/src/lib/candles.ts` — Supabase 조회 헬퍼
+- [ ] `CandleChart` 컴포넌트 — 가격 캔들 + RSI·MACD 패널
+- [ ] 종목별 차트 모달 또는 라우팅 분기 (홀딩 클릭 → 차트)
+- [ ] "통계 표시 전용, 매매 신호 아님" 면책 문구
 
 ---
 

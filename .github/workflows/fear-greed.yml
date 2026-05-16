@@ -1,0 +1,46 @@
+# Alternative.me 공포·탐욕 지수를 매일 1회 폴링해 Supabase fear_greed 테이블에 적재한다.
+# 워커는 POLL_ONCE=1 모드로 1회 실행 후 종료한다.
+#
+# 주기: 매일 01:00 UTC (10:00 KST). Alternative.me는 00:00 UTC 갱신으로 알려져 있어 그 직후.
+# 가격 폴러(price-poll.yml)와 달리 일봉 갱신 빈도가 낮아 자동 발화 지연 영향이 거의 없다.
+
+name: fear & greed poller
+
+on:
+  schedule:
+    - cron: '0 1 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fear-greed
+  cancel-in-progress: false
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: worker/requirements.txt
+
+      - name: Install deps
+        run: pip install -r worker/requirements.txt
+
+      - name: Run poller (1회 적재)
+        working-directory: worker
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          POLL_ONCE: '1'
+          WORKER_ENV: github-actions
+        run: python fear_greed_poller.py
