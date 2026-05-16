@@ -5,7 +5,7 @@
 ---
 
 ## 현재 상태 (2026-05-16)
-**Stage 1-A/B/C 모두 완료. MVP 로컬 동작 검증 완료. 다음은 1-D 검증 (RLS·번들·Vercel end-to-end) + 워커 호스팅 결정.**
+**Stage 1 MVP 사실상 완료. 1-A/B/C/D 본 항목 모두 통과 (RLS 다중계정·번들 보안·Vercel prod end-to-end 모두 검증). 남은 결정 1건: 워커 long-running 호스팅 (Railway 유료/Render/Fly/GitHub Actions cron).**
 
 | 영역 | 상태 | 비고 |
 |---|---|---|
