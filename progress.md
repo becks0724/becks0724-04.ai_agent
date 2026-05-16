@@ -4,8 +4,8 @@
 
 ---
 
-## 현재 상태 (2026-05-17 KST 01:50)
-**Stage 1 MVP 완전 마감.** 1-A/B/C/D + 워커 호스팅(GitHub Actions cron 15분 간격) 모두 통과. workflow_dispatch 첫 수동 실행 성공(24s) → Supabase price_snapshots id 7-9 적재 확인(BTC/ETH/SOL, 2026-05-16 15:19 UTC). cron 주기는 5분 → 15분 조정 + repo public 전환으로 발화 안정성 보강. **cron schedule 자동 발화는 아직 미관측** (GitHub Free best-effort 범위, 다음 세션 시작 시점에는 누적되어 있을 것으로 예상).
+## 현재 상태 (2026-05-17 KST 02:25)
+**Stage 1 MVP + auth 리팩토링 완료.** Stage 1-A/B/C/D + 워커 호스팅(GitHub Actions cron 15분) 통과. 본 세션에서 **auth 리팩토링 완료** — `useAuth` 훅을 `AuthProvider` Context로 승격, session/userId prop drilling 제거, `signOut`/`error` 상태 노출, env vars silent fail → explicit throw. 빌드(407KB / gzip 115KB 동일), 번들 보안(sb_publishable 1, sb_secret/service_role 0), 로컬 dev에서 Login 렌더링·에러 노출 확인. 커밋 `74ccac6` 푸시 완료 → Vercel 자동 배포. **cron schedule 자동 발화는 여전히 0건** (수동 트리거 3건 모두 성공 — workflow 자체는 정상).
 
 | 영역 | 상태 | 비고 |
 |---|---|---|
@@ -13,7 +13,8 @@
 | GitHub | ✓ | `becks0724/04.ai_agent` (**public**, main). 2FA + Passkey 활성 |
 | Supabase | ✓ | Singapore region, `plpkmaqyrqkjqnvnqexe.supabase.co`. RLS 다중계정 검증 통과 |
 | Vercel | ✓ | `https://crypto-monitoring-one.vercel.app`, env vars 등록, end-to-end 통과 |
-| 워커 호스팅 | ✓ 설정 / ⏳ 발화 검증 | GitHub Actions cron `*/15 * * * *` (Railway/Render/Fly 미사용. Railway 보류는 종결). schedule 자동 발화는 다음 세션에서 누적 확인 |
+| 워커 호스팅 | ✓ 설정 / ⚠ schedule 미발화 | GitHub Actions cron `*/15 * * * *`. workflow_dispatch 3건 모두 성공(Supabase 적재 정상). schedule 자동 발화는 24h+ 0건 — GitHub Free best-effort 한계로 잠정 결론. 외부 cron-job.org/Fly.io는 사용자 액션 필요로 보류 |
+| auth 리팩토링 | ✓ | AuthContext 도입, prop drilling 제거, signOut/error 노출, env throw. 커밋 `74ccac6` 푸시 → Vercel 자동 배포 |
 
 ---
 
@@ -68,12 +69,34 @@
 
 ---
 
+## Stage 1 후속 — auth 리팩토링 ✓ (2026-05-17)
+
+### 동기
+session prop이 `App → AppShell`로, userId prop이 `AppShell → HoldingForm`으로 drilling. 깊은 자식이 세션을 쓰려면 prop 체인 확장 필요. 에러 상태 미노출(getSession 실패 silent). env vars 빈 문자열 fallback이 "검은 화면" 유발.
+
+### 변경 파일 (7개, 커밋 `74ccac6`)
+- `frontend/src/lib/useAuth.ts` → `useAuth.tsx` (리네임 + Context 패턴, `AuthProvider` + `useAuth` 훅. 반환값에 `user`, `error`, `signOut` 추가)
+- `frontend/src/lib/supabase.ts` — env 미설정 시 throw (explicit failure)
+- `frontend/src/main.tsx` — `<AuthProvider>` 래핑
+- `frontend/src/App.tsx` — session prop 제거, error+세션없음 케이스 처리
+- `frontend/src/components/AppShell.tsx` — session prop 제거, `useAuth()`/`signOut` 직접 호출
+- `frontend/src/components/HoldingForm.tsx` — userId prop 제거, `useAuth().user.id` 직접 사용 + 세션 만료 가드
+
+### 검증
+- `npm run build` ✓ (407KB / gzip 115KB, Stage 1 종료 시점과 동일)
+- 번들 보안 ✓ (`sb_publishable` 1, `sb_secret`/`service_role` 0)
+- 로컬 dev (`localhost:5174`) — Login 렌더링, `useAuth must be used inside <AuthProvider>` 에러 없음, 에러 상태 노출 정상 (Supabase OTP rate limit 메시지 표시)
+- 풀 시나리오(로그인→자산추가→로그아웃) 검증은 Supabase OTP rate limit으로 로컬에서 미완. Vercel 자동 배포 후 prod 기존 세션으로 검증 종결.
+
+---
+
 ## 다음 할 일 (다음 세션 시작 시)
 
-### 즉시 — Stage 1-E 잔여 확인
-1. `gh run list --workflow=price-poll.yml --limit 20` — schedule 트리거 run이 누적됐는지 확인
-2. Supabase `price_snapshots` `max(id)` 확인 — id 10+ 가 들어와 있어야 정상
-3. 정상 누적이면 1-E 완전 종결. 0건이면 옵션 재검토 (외부 cron-job.org / Fly.io 등)
+### Stage 1-E cron 발화 (잠정 결론)
+GitHub Actions Free plan의 schedule cron은 24h+ 0건 — 무료 plan의 알려진 best-effort 한계. workflow 자체는 정상(workflow_dispatch 3건 모두 성공). **잠정 결론**: 수동 트리거 + 사용자가 필요 시 발화. 다음 옵션은 사용자 의사 결정 필요:
+- 외부 cron-job.org (PAT 발급 필요)
+- Fly.io 무료 VM 이전 (장기 운영 시)
+- 현 상태 유지 (Stage 2까지 가격 fresh가 critical 아님)
 
 ### 본 작업 — Stage 2 진입 (캔들 수집 + 기술적 지표 + 공포·탐욕)
 - 캔들 데이터 테이블 설계 (timeframe별)

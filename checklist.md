@@ -52,7 +52,23 @@
   - [x] GitHub Repository Secrets에 `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` 등록 — 2026-05-17
   - [x] workflow_dispatch로 1회 수동 실행 → Supabase `price_snapshots`에 id 7-9 (BTC 78078 / ETH 2178.19 / SOL 86.36) 적재 확인 — 2026-05-17 00:19 KST
   - [x] repo private → public 전환 (cron 발화 안정성 보강, 사전 검증 통과 후) — 2026-05-17 01:40 KST
-  - [ ] **(다음 세션 첫 작업)** cron schedule 자동 실행 누적 확인. 0건이면 외부 cron(cron-job.org) 또는 Fly.io 옵션 재검토
+  - [x] cron schedule 자동 실행 누적 확인 — 2026-05-17 02:00 KST, 24h+ 0건. GitHub Free best-effort 한계로 **잠정 결론**: 수동 트리거 + 필요 시 외부 cron/Fly.io 검토 (사용자 액션 필요로 보류)
+
+---
+
+## Stage 1 후속 · auth 리팩토링 ✓ 완료 (2026-05-17)
+
+- [x] `useAuth` 훅을 `AuthProvider` Context 패턴으로 승격 (`useAuth.ts` → `useAuth.tsx`)
+- [x] `session`/`userId` prop drilling 제거 (AppShell, HoldingForm이 `useAuth()` 직접 호출)
+- [x] 반환값에 `user`, `error`, `signOut` 추가 (`signOut` hook 노출로 supabase 직접 import 제거)
+- [x] `supabase.ts` env 미설정 시 silent fail → explicit throw
+- [x] `main.tsx`에서 `<AuthProvider>` 래핑
+- [x] `App.tsx`에서 error+세션없음 케이스 분기 추가
+- [x] `HoldingForm`에 세션 만료 가드 추가 (`user` null이면 등록 차단)
+- [x] `npm run build` 통과 (407KB / gzip 115KB)
+- [x] 번들 보안 검증 (sb_publishable 1, sb_secret/service_role 0)
+- [x] 로컬 dev 검증 — Login 렌더링·에러 노출 OK. 풀 시나리오는 OTP rate limit으로 prod에서 종결
+- [x] 커밋 `74ccac6` 푸시 → Vercel 자동 배포
 
 ---
 
