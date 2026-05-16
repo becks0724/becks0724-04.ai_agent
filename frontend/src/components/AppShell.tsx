@@ -8,6 +8,8 @@ import { fetchUsdKrw } from '../lib/fx'
 import type { UsdKrwRate } from '../lib/fx'
 import { fetchLatestPrices } from '../lib/prices'
 import type { PriceSnapshot } from '../lib/prices'
+import { fetchLatestFearGreed } from '../lib/fearGreed'
+import type { FearGreed } from '../lib/fearGreed'
 import { normalizeError } from '../lib/errors'
 import { HoldingForm } from './HoldingForm'
 import { HoldingsList } from './HoldingsList'
@@ -33,6 +35,9 @@ export function AppShell() {
   const [pricesAt, setPricesAt] = useState<number | null>(null)
   const [pricesError, setPricesError] = useState<string | null>(null)
 
+  // fear & greed (일 1회 갱신이라 마운트 시 1회만 조회. 사용자는 새로고침으로 최신화 가능)
+  const [fearGreed, setFearGreed] = useState<FearGreed | null>(null)
+
   // 환율 1회 로드 + 수동 새로고침
   const loadFx = useCallback(async () => {
     setFxLoading(true)
@@ -48,6 +53,21 @@ export function AppShell() {
   useEffect(() => {
     loadFx()
   }, [loadFx])
+
+  // fear & greed 1회 로드. 실패해도 다른 영역 영향 없게 silent.
+  useEffect(() => {
+    let mounted = true
+    fetchLatestFearGreed()
+      .then((row) => {
+        if (mounted) setFearGreed(row)
+      })
+      .catch(() => {
+        // 표시 영역만 사라질 뿐 핵심 기능엔 영향 없으니 사용자 알림 생략.
+      })
+    return () => {
+      mounted = false
+    }
+  }, [])
 
   // holdings 1회 로드
   useEffect(() => {
@@ -103,6 +123,15 @@ export function AppShell() {
     <div style={styles.wrapper}>
       <header style={styles.header}>
         <div style={styles.brand}>crypto-monitoring</div>
+        {fearGreed && (
+          <div style={styles.fearGreed} title={`기준일 ${fearGreed.capturedAt.slice(0, 10)}`}>
+            <span style={styles.fgLabel}>공포·탐욕</span>
+            <span style={{ ...styles.fgValue, color: fgColor(fearGreed.classification) }}>
+              {fearGreed.value}
+            </span>
+            <span style={styles.fgClass}>({fearGreed.classification})</span>
+          </div>
+        )}
         <div style={styles.right}>
           <span style={styles.email}>{email}</span>
           <button
@@ -233,6 +262,17 @@ function SummaryBox({
   )
 }
 
+function fgColor(classification: string): string {
+  switch (classification) {
+    case 'Extreme Fear': return '#fca5a5'
+    case 'Fear':         return '#fb923c'
+    case 'Neutral':      return '#facc15'
+    case 'Greed':        return '#86efac'
+    case 'Extreme Greed':return '#34d399'
+    default:             return '#9aa3ad'
+  }
+}
+
 const styles: Record<string, React.CSSProperties> = {
   wrapper: { minHeight: '100vh', background: '#0b0d10', color: '#e6e8eb' },
   header: {
@@ -243,6 +283,18 @@ const styles: Record<string, React.CSSProperties> = {
     borderBottom: '1px solid #1c1f24',
   },
   brand: { fontWeight: 700 },
+  fearGreed: {
+    display: 'flex',
+    alignItems: 'baseline',
+    gap: '6px',
+    padding: '4px 10px',
+    background: '#11141a',
+    border: '1px solid #1c1f24',
+    borderRadius: '6px',
+  },
+  fgLabel: { fontSize: '12px', color: '#9aa3ad' },
+  fgValue: { fontSize: '16px', fontWeight: 700 },
+  fgClass: { fontSize: '12px', color: '#9aa3ad' },
   right: { display: 'flex', alignItems: 'center', gap: '12px' },
   email: { color: '#9aa3ad', fontSize: '13px' },
   logout: {
