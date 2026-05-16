@@ -44,9 +44,9 @@
 - [x] 가격 자동 갱신 — 30초 polling (Realtime은 Stage 5)
 
 ### 1-D. 검증
-- [x] 보유 자산 1건 등록 → 평가금액이 가격 변동에 따라 갱신되는지 확인 (워커 무한 폴링 + 30초 프론트 폴링)
-- [ ] 다른 사용자가 내 데이터를 조회할 수 없는지 RLS 검증 (시크릿 창 두 번째 계정 로그인)
-- [ ] 프론트 번들에 API 키가 포함되지 않는지 빌드 산출물 재검사 (`sb_publishable` 1, `sb_secret`/`service_role` 0)
+- [x] 보유 자산 1건 등록 → 평가금액이 가격 변동에 따라 갱신되는지 확인 (워커 무한 폴링 + 30초 프론트 폴링) — 2026-05-16
+- [x] 다른 사용자가 내 데이터를 조회할 수 없는지 RLS 검증 — 2026-05-16 (woojinchang0728@gmail.com / becks0728@naver.com 두 계정 격리 확인. DB에는 두 행 모두 존재, 프론트에서는 각자 본인 행만 표시)
+- [x] 프론트 번들에 API 키가 포함되지 않는지 빌드 산출물 재검사 — `sb_publishable` 1, `sb_secret`/`service_role` 0, service_role 본문 텍스트 0
 - [ ] Vercel + Supabase end-to-end 동작 확인 (Vercel 환경변수 갱신 + Site URL에 prod 도메인 추가)
 - [ ] (Railway 보류 항목) 워커 long-running 호스팅 결정 (Railway 유료/Render/Fly)
 
