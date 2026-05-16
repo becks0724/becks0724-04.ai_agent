@@ -20,19 +20,20 @@
 
 ## Stage 1 · MVP — 수동 입력 포트폴리오 + 거래소 시세 폴링 ★ 현재 진행
 
-### 1-A. 데이터 모델
-- [ ] Supabase `portfolio_holdings` 테이블 설계 (id, user_id, symbol, quantity, avg_buy_price, created_at, updated_at)
-- [ ] Supabase `price_snapshots` 테이블 설계 (id, symbol, price_usd, fetched_at)
-- [ ] RLS(Row Level Security) 정책 — 본인 데이터만 접근 가능하도록 설정
-- [ ] 마이그레이션 SQL을 `worker/migrations/` 또는 Supabase migrations에 저장
+### 1-A. 데이터 모델 ✓ 완료 (2026-05-16)
+- [x] Supabase `portfolio_holdings` 테이블 설계 (id, user_id, symbol, quantity, avg_buy_price, created_at, updated_at)
+- [x] Supabase `price_snapshots` 테이블 설계 (id, symbol, price_usd, fetched_at)
+- [x] RLS(Row Level Security) 정책 — 본인 데이터만 접근 가능하도록 설정
+- [x] 마이그레이션 SQL을 `worker/migrations/` 또는 Supabase migrations에 저장 — `worker/migrations/0001_init.sql`
+- [x] Supabase SQL Editor에서 `0001_init.sql` 실행 → 테이블·정책 생성 확인 (holdings 4 RLS policies, snapshots 1 RLS policy)
 
-### 1-B. 워커 — 시세 폴링
-- [ ] 거래소 시세 API 선택 (예: Binance public ticker, CoinGecko)
-- [ ] `worker/price_poller.py` 작성 — N초 간격으로 가격 조회 후 `price_snapshots`에 적재
-- [ ] 폴링 주기·심볼 목록을 환경변수로 분리
-- [ ] 에러 핸들링 (rate limit, 네트워크 오류, 재시도 백오프)
+### 1-B. 워커 — 시세 폴링 ★ 진행 중 (배포만 남음)
+- [x] 거래소 시세 API 선택 — CoinGecko `/simple/price` (키 불필요)
+- [x] `worker/price_poller.py` 작성 — N초 간격으로 가격 조회 후 `price_snapshots`에 적재
+- [x] 폴링 주기·심볼 목록을 환경변수로 분리 — `POLL_INTERVAL_SECONDS`, `POLL_SYMBOLS`, `POLL_ONCE`
+- [x] 에러 핸들링 (rate limit 429, 네트워크 오류, 지수 백오프 2/4/8s, SIGINT/SIGTERM graceful shutdown)
 - [ ] Railway(유료) 또는 Render/Fly(무료 대안) 중 결정 후 long-running 프로세스로 배포
-- [ ] 로컬 1회 수동 실행 → Supabase에 레코드 적재 확인
+- [x] 로컬 1회 수동 실행 → Supabase에 레코드 적재 확인 (BTC/ETH/SOL 3건, service_role select 검증 완료)
 
 ### 1-C. 프론트엔드 — 포트폴리오 CRUD
 - [ ] Supabase 클라이언트 셋업 (`@supabase/supabase-js`, 환경변수 주입)

@@ -5,7 +5,7 @@
 ---
 
 ## 현재 상태 (2026-05-16)
-**Stage 0 완료 → Stage 1 (MVP — 포트폴리오 + 시세 폴러) 진입 준비**
+**Stage 1-A 완료 + Stage 1-B 코드 완성 (로컬 검증 통과) → 다음은 1-C 프론트 포트폴리오 CRUD. 배포는 1-C 종료 시 재결정.**
 
 | 영역 | 상태 | 비고 |
 |---|---|---|
@@ -43,11 +43,19 @@
 
 ## 다음 할 일 (Stage 1)
 
-### 1-A. 데이터 모델 (Supabase 마이그레이션) ★ 다음 시작
-- `portfolio_holdings` 테이블 — id, user_id, symbol, quantity, avg_buy_price, created_at, updated_at
-- `price_snapshots` 테이블 — id, symbol, price_usd, fetched_at
-- RLS 정책 — 본인 데이터만 select/insert/update/delete
-- `worker/migrations/0001_init.sql` 작성 후 Supabase SQL Editor에서 실행
+### 1-A. 데이터 모델 (Supabase 마이그레이션) ★ SQL 초안 완료, 실행 대기
+- [x] `worker/migrations/0001_init.sql` 작성
+  - `portfolio_holdings` — id, user_id(FK→auth.users CASCADE), symbol, quantity, avg_buy_price, created_at, updated_at
+    - `(user_id, symbol)` UNIQUE 제약 (중복 종목 등록 차단, 추가매수는 UPDATE)
+    - `set_updated_at()` 트리거로 updated_at 자동 갱신
+    - RLS: 본인 행만 select/insert/update/delete
+  - `price_snapshots` — id(bigserial), symbol, price_usd, fetched_at
+    - `(symbol, fetched_at desc)` 인덱스 (최신 시세 조회 최적화)
+    - RLS: authenticated 읽기 전용, 쓰기는 service_role(=worker)만
+- [ ] **사용자 액션 필요** — Supabase Dashboard → SQL Editor → `0001_init.sql` 붙여넣기 → Run
+- [ ] 실행 후 검증
+  - Table Editor에서 두 테이블 존재 확인
+  - Authentication → Policies에서 RLS 정책 4건(holdings) + 1건(snapshots) 확인
 
 ### 1-B. 워커 시세 폴러
 - `worker/price_poller.py` 작성
