@@ -51,7 +51,8 @@
 - [x] (Railway 보류 항목) 워커 long-running 호스팅 결정 — **GitHub Actions cron (15분 간격)** 선택. 비용 0, 무료 한도 충분. `.github/workflows/price-poll.yml` 작성. POLL_ONCE 모드로 15분마다 1회 실행 (초기 5분 시도했으나 무료 plan 발화 지연으로 15분으로 조정).
   - [x] GitHub Repository Secrets에 `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` 등록 — 2026-05-17
   - [x] workflow_dispatch로 1회 수동 실행 → Supabase `price_snapshots`에 id 7-9 (BTC 78078 / ETH 2178.19 / SOL 86.36) 적재 확인 — 2026-05-17 00:19 KST
-  - [ ] cron 자동 실행 정상 동작 확인 (15분 주기 다음 발화 모니터링)
+  - [x] repo private → public 전환 (cron 발화 안정성 보강, 사전 검증 통과 후) — 2026-05-17 01:40 KST
+  - [ ] **(다음 세션 첫 작업)** cron schedule 자동 실행 누적 확인. 0건이면 외부 cron(cron-job.org) 또는 Fly.io 옵션 재검토
 
 ---
 
