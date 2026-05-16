@@ -1,11 +1,44 @@
-// 로그인 후 표시되는 상단 헤더 + 빈 본문 골격. Stage 1-C 조각 2/3에서 채워진다.
+// 로그인 후 표시되는 헤더 + 포트폴리오 등록 폼 + 보유 목록.
+import { useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
+import { listHoldings } from '../lib/holdings'
+import type { Holding } from '../lib/holdings'
+import { normalizeError } from '../lib/errors'
+import { HoldingForm } from './HoldingForm'
+import { HoldingsList } from './HoldingsList'
 
 type Props = { session: Session }
 
 export function AppShell({ session }: Props) {
   const email = session.user.email ?? '익명'
+  const userId = session.user.id
+
+  const [holdings, setHoldings] = useState<Holding[]>([])
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let mounted = true
+    setLoading(true)
+    listHoldings()
+      .then((rows) => {
+        if (!mounted) return
+        setHoldings(rows)
+        setLoadError(null)
+      })
+      .catch((e) => {
+        if (!mounted) return
+        setLoadError(normalizeError(e).message)
+      })
+      .finally(() => {
+        if (mounted) setLoading(false)
+      })
+    return () => {
+      mounted = false
+    }
+  }, [])
+
   return (
     <div style={styles.wrapper}>
       <header style={styles.header}>
@@ -22,9 +55,16 @@ export function AppShell({ session }: Props) {
         </div>
       </header>
       <main style={styles.main}>
-        <p style={styles.placeholder}>
-          로그인 성공. 포트폴리오 CRUD UI는 Stage 1-C 조각 2에서 추가된다.
-        </p>
+        <h2 style={styles.sectionTitle}>포트폴리오</h2>
+        <HoldingForm
+          userId={userId}
+          onCreated={(h) => setHoldings((prev) => [...prev, h])}
+        />
+        {loading && <p style={styles.muted}>불러오는 중…</p>}
+        {loadError && <p style={styles.error}>목록 로딩 오류: {loadError}</p>}
+        {!loading && !loadError && (
+          <HoldingsList holdings={holdings} onChanged={setHoldings} />
+        )}
       </main>
     </div>
   )
@@ -51,6 +91,15 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     fontSize: '13px',
   },
-  main: { padding: '32px 20px', maxWidth: '960px', margin: '0 auto' },
-  placeholder: { color: '#9aa3ad' },
+  main: { padding: '24px 20px', maxWidth: '960px', margin: '0 auto' },
+  sectionTitle: { margin: '4px 0 14px', fontSize: '16px', fontWeight: 600 },
+  muted: { color: '#9aa3ad', fontSize: '14px' },
+  error: {
+    padding: '8px 10px',
+    background: '#2a1212',
+    border: '1px solid #6b1f1f',
+    borderRadius: '6px',
+    color: '#fca5a5',
+    fontSize: '13px',
+  },
 }
