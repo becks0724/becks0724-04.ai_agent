@@ -57,9 +57,68 @@
 - [ ] 워커에서 OHLCV 수집 잡 구현
 - [ ] RSI 계산 모듈 (Python, worker)
 - [ ] MACD 계산 모듈 (Python, worker)
-- [ ] 공포·탐욕 지수 API 연동 및 적재
+- [ ] 공포·탐욕 지수 API 연동 및 적재 (Alternative.me, 무료)
 - [ ] 프론트 차트 컴포넌트 (예: lightweight-charts)
 - [ ] 지표 오버레이 UI
+
+---
+
+## Stage 2.5 · 강세장 정점 신호 (Bull Market Peak Signals) — 백로그
+
+> 출처 — Coinglass `bull-market-peak-signals` 페이지 30개 지표 (참고: https://www.coinglass.com/bull-market-peak-signals).
+> 결정 (2026-05-16) — 데이터 소스는 **무료 공개 소스 + 자체 계산만**. Glassnode·Coinglass 유료 API는 도입하지 않는다.
+> 구현 시점 — Stage 1·2 완료 후. Stage 1-C 진입 우선.
+> 표시 정책 — CLAUDE.md "가격 예측 기능 없음" 원칙은 유지. 본 지표는 공개 통계의 **표시·이력**이며 매매 신호로 해석시키지 않는다. UI에 면책 문구 필수.
+
+### 2.5-A. 인프라
+- [ ] `peak_signals` 테이블 설계 (id, signal_key, value_numeric, threshold, hit boolean, captured_at)
+- [ ] 워커 일일 수집 잡 — 각 지표 1회/일 적재
+- [ ] 프론트 — 30개 지표 표 (현재값/기준값/명중여부/거리/Progress) + 평균 진행률 헤더
+
+### 2.5-B. 자체 계산 가능 (CoinGecko 가격만으로 산출, 무료)
+- [ ] **AHR999 지수** — `BTC / 200d_geomean_MA × growth_factor` (대략).
+- [ ] **AHR999x 고점 회피** — AHR999 변형.
+- [ ] **Pi Cycle Top** — `111dMA` vs `350dMA × 2` 교차.
+- [ ] **2년 MA 배수** — `price / 2yMA`.
+- [ ] **4년(1460d) 이동평균선** — `price / 1460dMA` *(CoinGecko 무료 365일 한도 → 워커가 매일 종가 적재 후 누적 5년치 직접 보유 필요)*.
+- [ ] **Mayer Multiple** — `price / 200dMA`.
+- [ ] **레인보우 차트** — 로그 회귀 밴드 (오픈소스 회귀식 사용).
+- [ ] **RSI 22일** — 일봉 종가 기반 RSI 계산.
+- [ ] **알트코인 시즌 지수** — top 50 알트 vs BTC 90일 수익률.
+- [ ] **비트코인 도미넌스** — CoinGecko `/global` API 직접.
+- [ ] **골든 레이쇼 멀티플라이어** — `price / 350dMA × ratio`.
+- [ ] **CBBI** — 여러 하위 지표 가중평균 (자체 정의 필요).
+- [ ] **Smithson의 예측** — 175k~230k 범위 비교 (단순 임계값).
+- [ ] **비트코인 트렌드 지표** — 정의 불명확. 정의 확정 후 구현.
+
+### 2.5-C. 무료 외부 페이지에서 스크랩/수집 가능
+- [ ] **ETF 순유출 일수** — Farside/SoSoValue 공개 페이지. 일일 ETF flow CSV.
+- [ ] **ETF/BTC 비율** — 누적 ETF 보유 BTC / 총 공급량. Farside 데이터로 계산.
+- [ ] **MicroStrategy 평균 매입 단가** — Saylortracker 또는 공시 데이터.
+- [ ] **USDT 플렉서블 세이빙** — Binance Earn 공개 페이지 (스크랩 안정성 ★ 낮음).
+
+### 2.5-D. 온체인 데이터 필요 — 무료 한도 안에서 가능한 것만 (보류 가능성 ★)
+> 무료 대안 후보 — `mempool.space` (UTXO 통계), `Blockchain.com Charts`, `CoinMetrics community` (일부 무료), `bitcoin-data.com` API.
+- [ ] **Puell Multiple** — 일일 발행량 × 가격 / 365d 평균. `bitcoin-data.com` 또는 `mempool.space` + CoinGecko 조합 가능.
+- [ ] **MVRV Z-Score** — Market cap vs Realized cap. `bitcoin-data.com` 무료 가능.
+- [ ] **NUPL (미실현 손익)** — Realized cap 필요. `bitcoin-data.com` 가능.
+- [ ] **RHODL 비율** — Glassnode 의존. 무료 대안 부재. **보류**.
+- [ ] **Reserve Risk** — Glassnode 의존. **보류**.
+- [ ] **MVRV 비율** — `bitcoin-data.com` 가능.
+- [ ] **LTH Supply / STH Supply%** — Glassnode 의존. **보류**.
+- [ ] **Bitcoin Macro Oscillator (BMO)** — Glassnode 의존. **보류**.
+- [ ] **Bitcoin Terminal Price** — Glassnode 의존. **보류**.
+- [ ] **비트코인 버블 지수** — 정의 불명확. **보류**.
+- [ ] **3개월 연환산 비율** — 정의 불명확. **보류**.
+- [ ] **CBBI** (재게재) — 위 자체계산 항목과 통합.
+
+### 2.5-E. UI / 결과 검증
+- [ ] 프론트 표 UI (스크린샷 레이아웃 참고: # / 지표 / 현재 / 기준값 / 명중 여부 / Distance to Hit / Progress)
+- [ ] 명중률 헤더 (예: "명중: X/30, 평균 진행률 Y%")
+- [ ] "매도 신호 아님 — 통계 표시 전용" 면책 문구
+- [ ] 과거 데이터 차트 (소형 sparkline 또는 상세 모달)
+
+> 예상 구현 가능 범위 — 자체 계산(2.5-B) 14개 + 외부 페이지(2.5-C) 4개 = **18-19개 / 30개**. 나머지(2.5-D 일부)는 무료 한계로 N/A 표시.
 
 ---
 

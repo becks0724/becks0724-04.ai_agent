@@ -82,12 +82,14 @@
 
 ## 보류 항목
 - **Railway 배포** — Stage 1의 long-running 폴러 완성 후 결정 (Railway 유료 $5/월 vs Render Free vs Fly.io)
+- **Stage 2.5 — 강세장 정점 신호 30개 (Coinglass 페이지 참고)** — checklist.md 백로그로 보존. 결정: 무료 공개 소스 + 자체 계산만(Glassnode·Coinglass 유료 미도입). 구현 시점은 Stage 1·2 완료 후. 예상 가용 범위 18-19/30.
 
 ---
 
 ## 의사결정 로그
 
 ### 2026-05-16
+- **Stage 2.5 강세장 정점 신호 — 백로그 추가, 무료 소스만** — Why: 30개 중 다수가 유료 온체인 API(Glassnode/Coinglass) 의존. MVP는 포트폴리오 우선. 무료(CoinGecko 가격 자체계산 + Farside/SoSoValue/bitcoin-data.com 등 공개 페이지)로 구현 가능한 18-19개만 추후 진행. 나머지는 N/A 표시. 가격 예측 금지 원칙은 유지하며 "통계 표시 전용" 면책 필수.
 - **Vite 템플릿 `react-ts` (TypeScript) 선택** — Why: 포트폴리오/시세 타입 명확화, JS → TS 마이그레이션 비용 회피.
 - **worker venv 생성을 사용자 액션으로 분리** — Why: `brew install`은 사용자 시스템 변경. CLAUDE.md §12 안전 원칙.
 - **`requirements.txt` 최소(`python-dotenv` 1개)** — Why: CLAUDE.md §3 Simplicity. 실제 import 시점에 추가.
