@@ -1,0 +1,57 @@
+# 환경변수·비밀키 — 절대 커밋 금지
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+credentials.json
+service-account*.json
+
+# Node / Frontend
+node_modules/
+.pnp
+.pnp.js
+dist/
+dist-ssr/
+build/
+.vite/
+*.local
+.vercel/
+
+# Python / Worker
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+.coverage
+htmlcov/
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs/
+
+# Build artifacts
+*.tsbuildinfo
+
+# Railway / Vercel local caches
+.railway/
