@@ -4,20 +4,21 @@
 
 ---
 
-## Stage 0 · 프로젝트 초기 셋업
+## Stage 0 · 프로젝트 초기 셋업 ✓ 완료 (Railway 보류 제외)
 
 - [x] Git 저장소 초기화 및 `.gitignore` 작성 (`.env*`, `node_modules`, `__pycache__`, `.venv` 포함)
 - [x] `frontend/` 디렉토리 생성, Vite + React(TypeScript) 템플릿 초기화 — `npm run build` 통과 확인
 - [x] `worker/` 디렉토리 생성, `requirements.txt`·`main.py`(hello world) 초기 생성
-- [ ] **(user)** Python 3.11 설치 후 `worker/.venv` 생성 — `brew install python@3.11` → `python3.11 -m venv worker/.venv`
-- [ ] **(user)** Supabase 프로젝트 생성, URL·anon key·service_role key를 각 `.env`에 기입
-- [ ] **(user)** Vercel 프로젝트 연결 (frontend) — 빈 페이지라도 배포 1회 확인
-- [ ] **(user)** Railway 프로젝트 연결 (worker) — Hello World 워커 배포 1회 확인
+- [x] GitHub 원격 저장소 연결 — `becks0724/04.ai_agent` (private), `main` push 완료
+- [x] Python 3.11 설치 + `worker/.venv` 생성 + `python main.py` hello world 출력 확인
+- [x] Supabase 프로젝트(`becks0724's Project`, Singapore) 생성, publishable/secret 키를 `frontend/.env.local`·`worker/.env`에 기입 + 차단·로드 검증 완료
+- [x] Vercel 프로젝트 연결 (frontend) — Root=`frontend`, `VITE_SUPABASE_*` 등록, `https://crypto-monitoring-one.vercel.app` 배포 + 번들 보안 검색(sb_secret/service_role 0건) 통과
+- [~] **(보류, Stage 1 종료 시 재검토)** Railway 프로젝트 연결 — Railway trial 만료로 결제 필요. `main.py`가 즉시 종료 스크립트라 현 시점 배포 검증의 실익이 낮음. 로컬 hello world(`env=local`) 검증은 완료. Stage 1에서 long-running 폴러 완성 후 Railway 유료 / Render / Fly 중 결정.
 - [x] 프론트 ↔ 워커 ↔ Supabase 환경변수 분리 정책 문서화 (`CLAUDE.md` "환경변수 분리 정책" 섹션 + `.env.example` 2종)
 
 ---
 
-## Stage 1 · MVP — 수동 입력 포트폴리오 + 거래소 시세 폴링 ★상세★
+## Stage 1 · MVP — 수동 입력 포트폴리오 + 거래소 시세 폴링 ★ 현재 진행
 
 ### 1-A. 데이터 모델
 - [ ] Supabase `portfolio_holdings` 테이블 설계 (id, user_id, symbol, quantity, avg_buy_price, created_at, updated_at)
@@ -30,7 +31,7 @@
 - [ ] `worker/price_poller.py` 작성 — N초 간격으로 가격 조회 후 `price_snapshots`에 적재
 - [ ] 폴링 주기·심볼 목록을 환경변수로 분리
 - [ ] 에러 핸들링 (rate limit, 네트워크 오류, 재시도 백오프)
-- [ ] Railway에 long-running 프로세스 또는 cron으로 배포
+- [ ] Railway(유료) 또는 Render/Fly(무료 대안) 중 결정 후 long-running 프로세스로 배포
 - [ ] 로컬 1회 수동 실행 → Supabase에 레코드 적재 확인
 
 ### 1-C. 프론트엔드 — 포트폴리오 CRUD

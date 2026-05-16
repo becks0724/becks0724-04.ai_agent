@@ -4,6 +4,12 @@
 크립토 포트폴리오 모니터링과 뉴스·지표 대시보드를 제공하는 웹 애플리케이션이다.
 사용자는 수동으로 보유 자산을 입력하고, 실시간 시세·기술적 지표·뉴스 감성을 한 화면에서 확인한다.
 
+## 현재 단계 (2026-05-16 기준)
+- **Stage 0 완료** — Git/스캐폴드(Vite+TS, Python 3.11)/GitHub(`becks0724/04.ai_agent`)/Supabase(Singapore)/Vercel(`crypto-monitoring-one.vercel.app`) 모두 검증 완료.
+- **Stage 1 진입 대기** — 데이터 모델(`portfolio_holdings`, `price_snapshots`, RLS) → 워커 시세 폴러 → 프론트 포트폴리오 CRUD.
+- **보류** — Railway 배포는 Stage 1의 long-running 폴러 완성 시점에 Railway 유료/Render/Fly 중 결정.
+- 세부 진행 사항은 `progress.md`, 작업 단위 체크리스트는 `checklist.md`.
+
 ## 기술 스택
 - **프론트엔드** — React + Vite, Vercel 배포
 - **워커/백엔드** — Python 3.11, Railway 배포
