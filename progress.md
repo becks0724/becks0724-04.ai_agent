@@ -5,7 +5,7 @@
 ---
 
 ## 현재 상태 (2026-05-17)
-**Stage 1 MVP 완전 마감.** 1-A/B/C/D + 워커 호스팅(GitHub Actions cron 5분 간격) 모두 통과. workflow_dispatch 첫 수동 실행 성공(24s) → Supabase price_snapshots id 7-9 적재 확인(BTC/ETH/SOL, KST 00:19). 이후 cron이 5분마다 자동 적재.
+**Stage 1 MVP 완전 마감.** 1-A/B/C/D + 워커 호스팅(GitHub Actions cron 15분 간격) 모두 통과. workflow_dispatch 첫 수동 실행 성공(24s) → Supabase price_snapshots id 7-9 적재 확인(BTC/ETH/SOL, KST 00:19). cron 주기는 5분 → 15분으로 조정 (무료 plan 발화 안정성↑). 이후 cron이 15분마다 자동 적재.
 
 | 영역 | 상태 | 비고 |
 |---|---|---|
@@ -62,7 +62,7 @@
 - Vercel + Supabase end-to-end — prod URL Magic Link 로그인·CRUD·평가금액 모두 정상
 
 ### 1-E. 워커 호스팅 ✓
-- **GitHub Actions cron** 선택 (5분 간격). `.github/workflows/price-poll.yml`. POLL_ONCE 모드.
+- **GitHub Actions cron** 선택 (15분 간격, 5분에서 조정). `.github/workflows/price-poll.yml`. POLL_ONCE 모드.
 - 보안 조건 5/5 충족: private repo, secrets-as-env, 워커 코드 print 없음, 공식 actions만, GitHub 2FA + Passkey 활성.
 - 수동 실행 24s 완료, Supabase id 7-9 적재 확인.
 
@@ -78,6 +78,7 @@
 
 ### 2026-05-16
 - **워커 호스팅 — GitHub Actions cron 채택 (2026-05-17)** — Why: 비용 0, Public/private repo 무료 한도(2000분/월) 충분, 30초→5분 폴링이 MVP에 부족하지 않음, 기존 GitHub 인프라 외 추가 도입 없음. Railway 유료/Render/Fly 모두 후순위 후보로 남김. 보안 조건 5/5 충족(private repo + 2FA + Passkey + secrets-as-env + 공식 actions만).
+- **cron 주기 5분 → 15분 (2026-05-17)** — Why: 무료 plan에서 5분 cron은 첫 발화 지연이 30분+로 누락·지연이 잦다(우리도 37분 지연 관측). 15분이면 GitHub Actions 발화 안정성↑, CoinGecko 부하↓, MVP 가격 fresh에는 영향 없음.
 - **Stage 2.5 소스 갱신 — CMC 공식 API + CoinGecko 혼합** — Why: 사용자 제안으로 CMC 페이지 검토 결과, Coinglass 30개 1:1 대체는 불가능하지만 Altcoin Season Index는 CMC 공식 API(`/v1/altcoin-season-index/latest`)가 존재해 합법적으로 가져올 수 있다. Pi Cycle/Puell/Rainbow 등은 CMC academy 정의를 따라 CoinGecko 종가로 자체 계산하는 길을 동시에 유지. 스크래핑·유료 API는 계속 미도입. 사용자 액션 — CMC Pro Basic 키 발급. CMC API에 Pi Cycle/Puell 전용 엔드포인트가 있는지 ★ 미확인 (키 받은 뒤 실제 호출로 확인).
 - **Stage 2.5 강세장 정점 신호 — 백로그 추가, 무료 소스만** — Why: 30개 중 다수가 유료 온체인 API(Glassnode/Coinglass) 의존. MVP는 포트폴리오 우선. 무료(CoinGecko 가격 자체계산 + Farside/SoSoValue/bitcoin-data.com 등 공개 페이지)로 구현 가능한 ~18-23개만 추후 진행. 나머지는 N/A 표시. 가격 예측 금지 원칙은 유지하며 "통계 표시 전용" 면책 필수.
 - **Vite 템플릿 `react-ts` (TypeScript) 선택** — Why: 포트폴리오/시세 타입 명확화, JS → TS 마이그레이션 비용 회피.

@@ -1,12 +1,16 @@
-# CoinGecko 시세를 5분마다 폴링해 Supabase price_snapshots에 적재한다.
-# 워커는 POLL_ONCE=1 모드로 1회 실행 후 종료. cron이 5분 간격으로 재트리거한다.
+# CoinGecko 시세를 15분마다 폴링해 Supabase price_snapshots에 적재한다.
+# 워커는 POLL_ONCE=1 모드로 1회 실행 후 종료. cron이 15분 간격으로 재트리거한다.
+#
+# 주기를 5분 → 15분으로 늘린 이유 (2026-05-17).
+#   - GitHub Actions 무료 plan은 짧은 cron 주기에서 발화가 누락·지연되는 경향.
+#   - 15분이면 MVP 가격 fresh에 충분, GitHub Actions/CoinGecko 부하 모두 감소.
 
 name: price poller
 
 on:
   schedule:
-    # 매 5분. 실제 발화 시각은 GitHub Actions 부하에 따라 수 분 지연될 수 있다.
-    - cron: '*/5 * * * *'
+    # 매 15분 정시 부근 (실제 발화 시각은 GitHub Actions 부하에 따라 수 분 지연 가능).
+    - cron: '*/15 * * * *'
   workflow_dispatch: # Actions 탭에서 "Run workflow"로 수동 실행
 
 permissions:
