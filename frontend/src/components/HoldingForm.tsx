@@ -1,68 +1,50 @@
 // 신규 보유 자산 등록 폼. 매수단가는 KRW/USD 양방향 자동 환산.
-import { useEffect, useState } from 'react'
+// fx 상태는 AppShell이 보유하고 prop으로 내려준다.
+import { useState } from 'react'
 import { createHolding } from '../lib/holdings'
 import type { Holding } from '../lib/holdings'
-import { fetchUsdKrw } from '../lib/fx'
 import type { UsdKrwRate } from '../lib/fx'
 import { normalizeError } from '../lib/errors'
 
 type Props = {
   userId: string
+  fx: UsdKrwRate | null
+  fxLoading: boolean
+  fxError: string | null
+  onReloadFx: () => void
   onCreated: (h: Holding) => void
 }
 
-export function HoldingForm({ userId, onCreated }: Props) {
+export function HoldingForm({ userId, fx, fxLoading, fxError, onReloadFx, onCreated }: Props) {
   const [symbol, setSymbol] = useState('')
   const [quantity, setQuantity] = useState('')
-  const [krw, setKrw] = useState('') // 사용자 입력 KRW (문자열 보존)
-  const [usd, setUsd] = useState('') // 사용자 입력 USD (문자열 보존)
+  const [krw, setKrw] = useState('')
+  const [usd, setUsd] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const [fx, setFx] = useState<UsdKrwRate | null>(null)
-  const [fxLoading, setFxLoading] = useState(true)
-  const [fxError, setFxError] = useState<string | null>(null)
-
-  const loadFx = async () => {
-    setFxLoading(true)
-    setFxError(null)
-    try {
-      const r = await fetchUsdKrw()
-      setFx(r)
-    } catch (e) {
-      setFxError(e instanceof Error ? e.message : String(e))
-    } finally {
-      setFxLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    loadFx()
-  }, [])
-
   const onChangeKrw = (next: string) => {
     setKrw(next)
-    if (!fx) {
+    if (!fx || next === '') {
       setUsd('')
       return
     }
     const n = Number(next)
-    if (!Number.isFinite(n) || next === '') {
+    if (!Number.isFinite(n)) {
       setUsd('')
       return
     }
-    // 1 USD = fx.rate KRW → USD = KRW / rate
     setUsd((n / fx.rate).toFixed(4))
   }
 
   const onChangeUsd = (next: string) => {
     setUsd(next)
-    if (!fx) {
+    if (!fx || next === '') {
       setKrw('')
       return
     }
     const n = Number(next)
-    if (!Number.isFinite(n) || next === '') {
+    if (!Number.isFinite(n)) {
       setKrw('')
       return
     }
@@ -100,7 +82,6 @@ export function HoldingForm({ userId, onCreated }: Props) {
       reset()
     } catch (e) {
       const { message, code } = normalizeError(e)
-      // Postgres unique_violation = 23505. message 텍스트도 함께 검사.
       if (code === '23505' || message.includes('portfolio_holdings_user_symbol_unique')) {
         setError(`${sym}은 이미 등록되어 있다. 목록에서 수정해라.`)
       } else {
@@ -180,9 +161,9 @@ export function HoldingForm({ userId, onCreated }: Props) {
           <>
             <span style={styles.muted}>
               1 USD = {fx.rate.toLocaleString('en-US', { maximumFractionDigits: 2 })} KRW
-              {' '}· 기준일 {fx.asOf} (ECB)
+              {' '}· 기준일 {fx.asOf.slice(0, 10)} ({fx.source})
             </span>
-            <button type="button" onClick={loadFx} style={styles.fxRefresh}>
+            <button type="button" onClick={onReloadFx} style={styles.fxRefresh}>
               새로고침
             </button>
           </>

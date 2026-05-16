@@ -1,15 +1,19 @@
-// 보유 자산 목록 테이블. 행마다 인라인 수정/삭제 가능.
+// 보유 자산 목록 테이블. 현재가/평가금액/손익 컬럼 + 인라인 수정/삭제.
 import { useState } from 'react'
 import { deleteHolding, updateHolding } from '../lib/holdings'
 import type { Holding } from '../lib/holdings'
+import type { PriceSnapshot } from '../lib/prices'
+import type { UsdKrwRate } from '../lib/fx'
 import { normalizeError } from '../lib/errors'
 
 type Props = {
   holdings: Holding[]
+  prices: Map<string, PriceSnapshot>
+  fx: UsdKrwRate | null
   onChanged: (next: Holding[]) => void
 }
 
-export function HoldingsList({ holdings, onChanged }: Props) {
+export function HoldingsList({ holdings, prices, fx, onChanged }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [draftQty, setDraftQty] = useState('')
   const [draftPrice, setDraftPrice] = useState('')
@@ -26,18 +30,15 @@ export function HoldingsList({ holdings, onChanged }: Props) {
     setDraftPrice(String(h.avg_buy_price))
     setError(null)
   }
-
   const cancelEdit = () => {
     setEditingId(null)
     setError(null)
   }
-
   const saveEdit = async (h: Holding) => {
     const qty = Number(draftQty)
     const price = Number(draftPrice)
     if (!Number.isFinite(qty) || qty <= 0) return setError('수량은 0보다 큰 숫자.')
     if (!Number.isFinite(price) || price < 0) return setError('매수단가는 0 이상.')
-
     setBusyId(h.id)
     setError(null)
     try {
@@ -50,7 +51,6 @@ export function HoldingsList({ holdings, onChanged }: Props) {
       setBusyId(null)
     }
   }
-
   const remove = async (h: Holding) => {
     if (!confirm(`${h.symbol} 보유 자산을 삭제할까?`)) return
     setBusyId(h.id)
@@ -72,8 +72,11 @@ export function HoldingsList({ holdings, onChanged }: Props) {
         <thead>
           <tr>
             <th style={styles.th}>심볼</th>
-            <th style={styles.th}>수량</th>
-            <th style={styles.th}>매수단가 (USD)</th>
+            <th style={styles.thRight}>수량</th>
+            <th style={styles.thRight}>매수단가 (USD)</th>
+            <th style={styles.thRight}>현재가 (USD)</th>
+            <th style={styles.thRight}>평가금액</th>
+            <th style={styles.thRight}>손익</th>
             <th style={styles.thRight}>액션</th>
           </tr>
         </thead>
@@ -81,10 +84,17 @@ export function HoldingsList({ holdings, onChanged }: Props) {
           {holdings.map((h) => {
             const editing = editingId === h.id
             const busy = busyId === h.id
+            const snap = prices.get(h.symbol)
+            const cost = h.quantity * h.avg_buy_price
+            const value = snap ? h.quantity * snap.price_usd : null
+            const pnl = value !== null ? value - cost : null
+            const pnlPct = pnl !== null && cost > 0 ? (pnl / cost) * 100 : null
+            const pnlColor =
+              pnl === null ? '#9aa3ad' : pnl > 0 ? '#34d399' : pnl < 0 ? '#fca5a5' : '#9aa3ad'
             return (
               <tr key={h.id} style={styles.tr}>
                 <td style={styles.tdSymbol}>{h.symbol}</td>
-                <td style={styles.td}>
+                <td style={styles.tdRight}>
                   {editing ? (
                     <input
                       type="number"
@@ -99,7 +109,7 @@ export function HoldingsList({ holdings, onChanged }: Props) {
                     formatNumber(h.quantity)
                   )}
                 </td>
-                <td style={styles.td}>
+                <td style={styles.tdRight}>
                   {editing ? (
                     <input
                       type="number"
@@ -112,6 +122,32 @@ export function HoldingsList({ holdings, onChanged }: Props) {
                     />
                   ) : (
                     formatUsd(h.avg_buy_price)
+                  )}
+                </td>
+                <td style={styles.tdRight}>{snap ? formatUsd(snap.price_usd) : '—'}</td>
+                <td style={styles.tdRight}>
+                  {value !== null ? (
+                    <>
+                      <div>{formatUsd(value)}</div>
+                      <div style={styles.subKrw}>{formatKrw(value, fx)}</div>
+                    </>
+                  ) : (
+                    '—'
+                  )}
+                </td>
+                <td style={{ ...styles.tdRight, color: pnlColor }}>
+                  {pnl !== null ? (
+                    <>
+                      <div>
+                        {formatUsd(pnl)}
+                        {pnlPct !== null && (
+                          <span style={styles.pct}> ({pnlPct.toFixed(2)}%)</span>
+                        )}
+                      </div>
+                      <div style={styles.subKrw}>{formatKrw(pnl, fx)}</div>
+                    </>
+                  ) : (
+                    '—'
                   )}
                 </td>
                 <td style={styles.tdActions}>
@@ -174,6 +210,10 @@ function formatUsd(n: number): string {
     maximumFractionDigits: 2,
   }).format(n)
 }
+function formatKrw(usd: number, fx: UsdKrwRate | null): string {
+  if (!fx) return ''
+  return `₩${new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 0 }).format(usd * fx.rate)}`
+}
 
 const styles: Record<string, React.CSSProperties> = {
   empty: { color: '#9aa3ad', fontSize: '14px' },
@@ -204,17 +244,23 @@ const styles: Record<string, React.CSSProperties> = {
     borderBottom: '1px solid #1c1f24',
   },
   tr: { borderBottom: '1px solid #1c1f24' },
-  td: { padding: '10px 14px', fontSize: '14px', color: '#e6e8eb' },
   tdSymbol: { padding: '10px 14px', fontSize: '14px', fontWeight: 700, color: '#e6e8eb' },
+  tdRight: {
+    padding: '10px 14px',
+    fontSize: '14px',
+    color: '#e6e8eb',
+    textAlign: 'right',
+    verticalAlign: 'top',
+  },
+  subKrw: { fontSize: '11px', color: '#9aa3ad', marginTop: '2px' },
+  pct: { fontSize: '12px', marginLeft: '4px' },
   tdActions: {
     padding: '10px 14px',
     textAlign: 'right',
-    display: 'flex',
-    gap: '6px',
-    justifyContent: 'flex-end',
+    whiteSpace: 'nowrap',
   },
   cellInput: {
-    width: '120px',
+    width: '110px',
     padding: '4px 8px',
     background: '#0b0d10',
     border: '1px solid #2a2f36',
@@ -222,6 +268,7 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#e6e8eb',
     fontSize: '13px',
     outline: 'none',
+    textAlign: 'right',
   },
   actionPrimary: {
     padding: '4px 10px',
@@ -231,6 +278,7 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#fff',
     fontSize: '12px',
     cursor: 'pointer',
+    marginLeft: '4px',
   },
   actionGhost: {
     padding: '4px 10px',
@@ -240,6 +288,7 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#e6e8eb',
     fontSize: '12px',
     cursor: 'pointer',
+    marginLeft: '4px',
   },
   actionDanger: {
     padding: '4px 10px',
@@ -249,6 +298,7 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#fca5a5',
     fontSize: '12px',
     cursor: 'pointer',
+    marginLeft: '4px',
   },
   error: {
     marginBottom: '10px',
