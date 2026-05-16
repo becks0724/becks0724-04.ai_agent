@@ -65,17 +65,32 @@
 
 ## Stage 2.5 · 강세장 정점 신호 (Bull Market Peak Signals) — 백로그
 
-> 출처 — Coinglass `bull-market-peak-signals` 페이지 30개 지표 (참고: https://www.coinglass.com/bull-market-peak-signals).
-> 결정 (2026-05-16) — 데이터 소스는 **무료 공개 소스 + 자체 계산만**. Glassnode·Coinglass 유료 API는 도입하지 않는다.
+> 참고 페이지
+> - Coinglass `bull-market-peak-signals` (30개 카탈로그) — https://www.coinglass.com/bull-market-peak-signals
+> - CoinMarketCap `crypto-market-cycle-indicators` — https://coinmarketcap.com/ko/charts/crypto-market-cycle-indicators/ (Pi Cycle / Puell / Rainbow 등 핵심 지표)
+> - CoinMarketCap `altcoin-season-index` — https://coinmarketcap.com/ko/charts/altcoin-season-index/
+>
+> 결정 (2026-05-16, 갱신)
+> - 데이터 출처 전략 — **CMC 공식 API + CoinGecko 자체 계산 혼합**. 페이지 스크래핑·유료 API(Glassnode/Coinglass) 미도입.
+> - 출처 우선순위 — 동일 지표가 양쪽에 있으면 **CMC API 우선**(공식·안정), 없으면 CoinGecko 종가로 자체 계산.
+> - **Coinglass 30개 1:1 대체는 불가능**. 무료 한도 안에서 가능한 ~18-20개만 구현, 나머지는 N/A 표시.
+>
 > 구현 시점 — Stage 1·2 완료 후. Stage 1-C 진입 우선.
 > 표시 정책 — CLAUDE.md "가격 예측 기능 없음" 원칙은 유지. 본 지표는 공개 통계의 **표시·이력**이며 매매 신호로 해석시키지 않는다. UI에 면책 문구 필수.
 
 ### 2.5-A. 인프라
-- [ ] `peak_signals` 테이블 설계 (id, signal_key, value_numeric, threshold, hit boolean, captured_at)
+- [ ] **사용자 액션** — CoinMarketCap Pro API key 발급 (Basic 무료 plan: 30 req/min, 10,000 credits/월)
+- [ ] `worker/.env`에 `CMC_API_KEY` 추가 + `.env.example` 갱신
+- [ ] `peak_signals` 테이블 설계 (id, signal_key, value_numeric, threshold, hit boolean, captured_at, source enum: 'cmc'/'coingecko'/'computed')
 - [ ] 워커 일일 수집 잡 — 각 지표 1회/일 적재
-- [ ] 프론트 — 30개 지표 표 (현재값/기준값/명중여부/거리/Progress) + 평균 진행률 헤더
+- [ ] 프론트 — 지표 표 (현재값/기준값/명중여부/거리/Progress) + 평균 진행률 헤더
 
-### 2.5-B. 자체 계산 가능 (CoinGecko 가격만으로 산출, 무료)
+### 2.5-B0. CMC 공식 API 사용 (출처 우선)
+- [ ] **알트코인 시즌 지수 (Altcoin Season Index)** — `GET /v1/altcoin-season-index/latest` 및 `/historical` (7d/30d/90d). 0-100 스케일, ≥75 알트시즌·≤25 비트코인 시즌. 15분 캐시·1 credit/call.
+- [ ] **공포·탐욕 지수 (Fear & Greed Index)** — `GET /v1/fear-and-greed/latest` (CMC). 대안: alternative.me 무료 API.
+- [ ] **★ CMC 'crypto-market-cycle-indicators' 페이지 지표 API 존재 여부 확인** — Pi Cycle Top / Puell Multiple / Rainbow Chart 등이 CMC API에서 별도 엔드포인트로 제공되는지 미확인. 화면용 위젯뿐일 가능성 ★. 확인 안 되면 아래 2.5-B1 자체 계산으로 폴백.
+
+### 2.5-B1. CoinGecko 가격으로 자체 계산 (CMC API에 없을 때 폴백·또는 무료 유지)
 - [ ] **AHR999 지수** — `BTC / 200d_geomean_MA × growth_factor` (대략).
 - [ ] **AHR999x 고점 회피** — AHR999 변형.
 - [ ] **Pi Cycle Top** — `111dMA` vs `350dMA × 2` 교차.
@@ -84,7 +99,6 @@
 - [ ] **Mayer Multiple** — `price / 200dMA`.
 - [ ] **레인보우 차트** — 로그 회귀 밴드 (오픈소스 회귀식 사용).
 - [ ] **RSI 22일** — 일봉 종가 기반 RSI 계산.
-- [ ] **알트코인 시즌 지수** — top 50 알트 vs BTC 90일 수익률.
 - [ ] **비트코인 도미넌스** — CoinGecko `/global` API 직접.
 - [ ] **골든 레이쇼 멀티플라이어** — `price / 350dMA × ratio`.
 - [ ] **CBBI** — 여러 하위 지표 가중평균 (자체 정의 필요).
@@ -118,7 +132,7 @@
 - [ ] "매도 신호 아님 — 통계 표시 전용" 면책 문구
 - [ ] 과거 데이터 차트 (소형 sparkline 또는 상세 모달)
 
-> 예상 구현 가능 범위 — 자체 계산(2.5-B) 14개 + 외부 페이지(2.5-C) 4개 = **18-19개 / 30개**. 나머지(2.5-D 일부)는 무료 한계로 N/A 표시.
+> 예상 구현 가능 범위 — CMC API(2.5-B0) 2-3개 + 자체 계산(2.5-B1) 13개 + 외부 페이지(2.5-C) 4개 + 온체인 무료(2.5-D 일부) 1-3개 = **약 20-23개 / 30개**. 나머지는 N/A 표시.
 
 ---
 
