@@ -49,9 +49,9 @@
 - [x] 프론트 번들에 API 키가 포함되지 않는지 빌드 산출물 재검사 — `sb_publishable` 1, `sb_secret`/`service_role` 0, service_role 본문 텍스트 0
 - [x] Vercel + Supabase end-to-end 동작 확인 — 2026-05-16 (Vercel `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` Production/Preview 등록, Supabase URL Configuration에 prod 도메인 redirect 추가, prod에서 매직링크 로그인·요약·목록·평가금액 모두 정상)
 - [x] (Railway 보류 항목) 워커 long-running 호스팅 결정 — **GitHub Actions cron (5분 간격)** 선택. 비용 0, 무료 한도 충분. `.github/workflows/price-poll.yml` 작성. POLL_ONCE 모드로 5분마다 1회 실행.
-  - [ ] GitHub Repository Secrets에 `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` 등록 (사용자 액션)
-  - [ ] workflow_dispatch로 1회 수동 실행 → Supabase price_snapshots 적재 확인
-  - [ ] cron 자동 실행 정상 동작 확인 (5분 이내 첫 실행)
+  - [x] GitHub Repository Secrets에 `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` 등록 — 2026-05-17
+  - [x] workflow_dispatch로 1회 수동 실행 → Supabase `price_snapshots`에 id 7-9 (BTC 78078 / ETH 2178.19 / SOL 86.36) 적재 확인 — 2026-05-17 00:19 KST
+  - [ ] cron 자동 실행 정상 동작 확인 (다음 5분 내 자동 발화 모니터링)
 
 ---
 
