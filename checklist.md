@@ -35,19 +35,20 @@
 - [ ] Railway(유료) 또는 Render/Fly(무료 대안) 중 결정 후 long-running 프로세스로 배포
 - [x] 로컬 1회 수동 실행 → Supabase에 레코드 적재 확인 (BTC/ETH/SOL 3건, service_role select 검증 완료)
 
-### 1-C. 프론트엔드 — 포트폴리오 CRUD
-- [ ] Supabase 클라이언트 셋업 (`@supabase/supabase-js`, 환경변수 주입)
-- [ ] 인증 페이지 (Supabase Auth, 이메일/매직링크 또는 OAuth)
-- [ ] 보유 자산 등록 폼 (symbol, quantity, avg_buy_price)
-- [ ] 보유 자산 목록 조회·수정·삭제 UI
-- [ ] 최신 가격 조회 → 평가금액·손익 계산·표시
-- [ ] 가격 자동 갱신 (polling 또는 Supabase Realtime 구독)
+### 1-C. 프론트엔드 — 포트폴리오 CRUD ✓ 완료 (2026-05-16)
+- [x] Supabase 클라이언트 셋업 (`@supabase/supabase-js`, `lib/supabase.ts`)
+- [x] 인증 페이지 — Supabase Auth Magic Link (`Login.tsx`, redirect Site URL 등록)
+- [x] 보유 자산 등록 폼 (symbol, quantity, avg_buy_price) — KRW↔USD 양방향 환산 (Frankfurter→open.er-api 폴백)
+- [x] 보유 자산 목록 조회·수정·삭제 UI (`HoldingsList.tsx`) — 인라인 수정, 삭제 확인 다이얼로그
+- [x] 최신 가격 조회 → 평가금액·손익 계산·표시 — `price_snapshots` dedupe 조회, USD/KRW 모두 표시
+- [x] 가격 자동 갱신 — 30초 polling (Realtime은 Stage 5)
 
 ### 1-D. 검증
-- [ ] 보유 자산 1건 등록 → 평가금액이 가격 변동에 따라 갱신되는지 확인
-- [ ] 다른 사용자가 내 데이터를 조회할 수 없는지 RLS 검증
-- [ ] 프론트 번들에 API 키가 포함되지 않는지 빌드 산출물 검사
-- [ ] Vercel + Railway + Supabase end-to-end 동작 확인
+- [x] 보유 자산 1건 등록 → 평가금액이 가격 변동에 따라 갱신되는지 확인 (워커 무한 폴링 + 30초 프론트 폴링)
+- [ ] 다른 사용자가 내 데이터를 조회할 수 없는지 RLS 검증 (시크릿 창 두 번째 계정 로그인)
+- [ ] 프론트 번들에 API 키가 포함되지 않는지 빌드 산출물 재검사 (`sb_publishable` 1, `sb_secret`/`service_role` 0)
+- [ ] Vercel + Supabase end-to-end 동작 확인 (Vercel 환경변수 갱신 + Site URL에 prod 도메인 추가)
+- [ ] (Railway 보류 항목) 워커 long-running 호스팅 결정 (Railway 유료/Render/Fly)
 
 ---
 
