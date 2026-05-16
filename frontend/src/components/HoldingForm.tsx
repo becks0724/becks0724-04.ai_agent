@@ -1,13 +1,13 @@
 // 신규 보유 자산 등록 폼. 매수단가는 KRW/USD 양방향 자동 환산.
-// fx 상태는 AppShell이 보유하고 prop으로 내려준다.
+// fx 상태는 AppShell이 보유하고 prop으로 내려준다. userId는 useAuth()로 직접 조회.
 import { useState } from 'react'
+import { useAuth } from '../lib/useAuth'
 import { createHolding } from '../lib/holdings'
 import type { Holding } from '../lib/holdings'
 import type { UsdKrwRate } from '../lib/fx'
 import { normalizeError } from '../lib/errors'
 
 type Props = {
-  userId: string
   fx: UsdKrwRate | null
   fxLoading: boolean
   fxError: string | null
@@ -15,7 +15,8 @@ type Props = {
   onCreated: (h: Holding) => void
 }
 
-export function HoldingForm({ userId, fx, fxLoading, fxError, onReloadFx, onCreated }: Props) {
+export function HoldingForm({ fx, fxLoading, fxError, onReloadFx, onCreated }: Props) {
+  const { user } = useAuth()
   const [symbol, setSymbol] = useState('')
   const [quantity, setQuantity] = useState('')
   const [krw, setKrw] = useState('')
@@ -71,12 +72,13 @@ export function HoldingForm({ userId, fx, fxLoading, fxError, onReloadFx, onCrea
     if (!Number.isFinite(priceUsd) || priceUsd < 0) {
       return setError('매수단가(USD)는 0 이상이어야 한다. KRW만 입력했다면 환율 로딩을 기다려라.')
     }
+    if (!user) return setError('로그인 세션이 만료됐다. 새로고침 후 다시 시도해라.')
 
     setSubmitting(true)
     try {
       const created = await createHolding(
         { symbol: sym, quantity: qty, avg_buy_price: priceUsd },
-        userId,
+        user.id,
       )
       onCreated(created)
       reset()

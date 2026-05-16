@@ -5,12 +5,15 @@ const url = import.meta.env.VITE_SUPABASE_URL as string | undefined
 const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
 
 if (!url || !anonKey) {
-  // 빌드 산출물에 값이 비어있으면 즉시 콘솔에 띄운다 (런타임 디버깅용).
-  // 보안상 어차피 publishable 키라 키 누출 위험은 없다.
-  console.error('[supabase] VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY 환경변수가 비어 있다.')
+  // 빌드 산출물이 환경변수 없이 배포된 경우, silent fail 대신 즉시 던져
+  // "검은 화면"이 아니라 명시적 오류 메시지가 콘솔에 보이게 한다.
+  throw new Error(
+    '[supabase] VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY 환경변수가 비어 있다. ' +
+      'Vercel Project Settings → Environment Variables를 확인해라.',
+  )
 }
 
-export const supabase = createClient(url ?? '', anonKey ?? '', {
+export const supabase = createClient(url, anonKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,

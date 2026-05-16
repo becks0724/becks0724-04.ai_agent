@@ -1,8 +1,7 @@
 // 로그인 후 표시되는 헤더 + 포트폴리오 폼 + 보유 목록.
 // fx(환율)와 prices(시세) 폴링을 이 컴포넌트에서 관리하고 자식에게 prop으로 전달한다.
 import { useCallback, useEffect, useState } from 'react'
-import type { Session } from '@supabase/supabase-js'
-import { supabase } from '../lib/supabase'
+import { useAuth } from '../lib/useAuth'
 import { listHoldings } from '../lib/holdings'
 import type { Holding } from '../lib/holdings'
 import { fetchUsdKrw } from '../lib/fx'
@@ -13,13 +12,11 @@ import { normalizeError } from '../lib/errors'
 import { HoldingForm } from './HoldingForm'
 import { HoldingsList } from './HoldingsList'
 
-type Props = { session: Session }
-
 const PRICE_POLL_MS = 30_000
 
-export function AppShell({ session }: Props) {
-  const email = session.user.email ?? '익명'
-  const userId = session.user.id
+export function AppShell() {
+  const { user, signOut } = useAuth()
+  const email = user?.email ?? '익명'
 
   // holdings
   const [holdings, setHoldings] = useState<Holding[]>([])
@@ -111,7 +108,7 @@ export function AppShell({ session }: Props) {
           <button
             type="button"
             style={styles.logout}
-            onClick={() => supabase.auth.signOut()}
+            onClick={() => signOut()}
           >
             로그아웃
           </button>
@@ -123,7 +120,6 @@ export function AppShell({ session }: Props) {
         <SummaryBox totals={totals} fx={fx} pricesAt={pricesAt} pricesError={pricesError} />
 
         <HoldingForm
-          userId={userId}
           fx={fx}
           fxLoading={fxLoading}
           fxError={fxError}
