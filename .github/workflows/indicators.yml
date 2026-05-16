@@ -1,0 +1,45 @@
+# candles 테이블의 일봉 close를 읽어 RSI/MACD를 계산해 indicators에 적재한다.
+# 워커는 POLL_ONCE=1 모드. candle-poll(01:15 UTC) 직후 발화하도록 01:30 UTC 스케줄.
+
+name: indicators poller
+
+on:
+  schedule:
+    - cron: '30 1 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: indicators
+  cancel-in-progress: false
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: worker/requirements.txt
+
+      - name: Install deps
+        run: pip install -r worker/requirements.txt
+
+      - name: Run indicators (1회 계산·적재)
+        working-directory: worker
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          POLL_SYMBOLS: BTC,ETH,SOL
+          POLL_ONCE: '1'
+          CANDLE_LOOKBACK: '200'
+          WORKER_ENV: github-actions
+        run: python indicators.py
