@@ -4,17 +4,22 @@
 
 ---
 
-## 현재 상태 (2026-05-17 KST 02:25)
-**Stage 1 MVP + auth 리팩토링 완료.** Stage 1-A/B/C/D + 워커 호스팅(GitHub Actions cron 15분) 통과. 본 세션에서 **auth 리팩토링 완료** — `useAuth` 훅을 `AuthProvider` Context로 승격, session/userId prop drilling 제거, `signOut`/`error` 상태 노출, env vars silent fail → explicit throw. 빌드(407KB / gzip 115KB 동일), 번들 보안(sb_publishable 1, sb_secret/service_role 0), 로컬 dev에서 Login 렌더링·에러 노출 확인. 커밋 `74ccac6` 푸시 완료 → Vercel 자동 배포. **cron schedule 자동 발화는 여전히 0건** (수동 트리거 3건 모두 성공 — workflow 자체는 정상).
+## 현재 상태 (2026-05-17 KST 04:00)
+**Stage 2 진입 — 백엔드 4건 중 3건 검증 완료.** Stage 1 MVP + auth 리팩토링 완료 후 Stage 2-A(캔들 모델)·2-B(캔들 폴러)·2-C(공포·탐욕 백엔드+UI)·2-D(RSI/MACD 코드)까지 진행. GitHub Actions workflow_dispatch 검증: fear-greed `value=31 Fear` 적재, candles BTC/ETH/SOL 각 3행(총 9건) 적재 완료. **2-D는 Supabase `0004_indicators.sql` 사용자 실행 보류 중** → 실행 완료 신호 시 indicators workflow_dispatch 자동 진행. 2-E 차트 UI는 lightweight-charts 도입 + 모달 방식으로 진행 예정. **cron schedule 자동 발화는 여전히 0건** (수동 트리거는 모두 성공 — workflow 자체는 정상).
 
 | 영역 | 상태 | 비고 |
 |---|---|---|
 | 로컬 스캐폴드 | ✓ | frontend (Vite+TS) / worker (Python 3.11) |
-| GitHub | ✓ | `becks0724/04.ai_agent` (**public**, main). 2FA + Passkey 활성 |
-| Supabase | ✓ | Singapore region, `plpkmaqyrqkjqnvnqexe.supabase.co`. RLS 다중계정 검증 통과 |
-| Vercel | ✓ | `https://crypto-monitoring-one.vercel.app`, env vars 등록, end-to-end 통과 |
-| 워커 호스팅 | ✓ 설정 / ⚠ schedule 미발화 | GitHub Actions cron `*/15 * * * *`. workflow_dispatch 3건 모두 성공(Supabase 적재 정상). schedule 자동 발화는 24h+ 0건 — GitHub Free best-effort 한계로 잠정 결론. 외부 cron-job.org/Fly.io는 사용자 액션 필요로 보류 |
+| GitHub | ✓ | `becks0724/becks0724-04.ai_agent` (**public**, main). 2FA + Passkey 활성 |
+| Supabase | ✓ | Singapore region, `plpkmaqyrqkjqnvnqexe.supabase.co`. 테이블 5종 (portfolio_holdings, price_snapshots, candles, fear_greed, **indicators 대기**) |
+| Vercel | ✓ | `https://crypto-monitoring-one.vercel.app`, env vars 등록, end-to-end 통과. AuthContext + 공포·탐욕 헤더 위젯 |
+| 워커 호스팅 | ✓ 설정 / ⚠ schedule 미발화 | GitHub Actions 4 워크플로 (price-poll 15분, fear-greed 01:00 UTC, candle-poll 01:15, indicators 01:30). workflow_dispatch는 모두 성공. schedule 자동 발화는 24h+ 0건 — GitHub Free best-effort 한계로 잠정 결론 |
 | auth 리팩토링 | ✓ | AuthContext 도입, prop drilling 제거, signOut/error 노출, env throw. 커밋 `74ccac6` 푸시 → Vercel 자동 배포 |
+| Stage 2-A 캔들 모델 | ✓ | `candles` 테이블, RLS 2정책, UNIQUE(symbol,timeframe,open_time) |
+| Stage 2-B 캔들 폴러 | ✓ | CoinGecko `/coins/{id}/market_chart?interval=daily`, close+volume, open/high/low=close. 9건 적재 확인 |
+| Stage 2-C 공포·탐욕 | ✓ | Alternative.me 무료, value=31 Fear 적재. AppShell 헤더 위젯 (분류별 색상) |
+| Stage 2-D 지표 | 코드 ✓ / 검증 보류 | RSI 14, MACD 12/26/9, pandas. **Supabase 0004 실행 사용자 액션 대기** |
+| Stage 2-E 차트 UI | 진행 중 | lightweight-charts, 모달 방식 예정 |
 
 ---
 

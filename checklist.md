@@ -81,33 +81,42 @@
 > - **공포·탐욕 출처** — Alternative.me 무료 API (CMC Pro key 미발급으로 1차 폴백).
 > - **시작 순서** — 2-A → 2-C(독립적·가벼움) → 2-B → 2-D → 2-E.
 
-### 2-A. 데이터 모델 ★ 진행 중
-- [x] `worker/migrations/0002_candles.sql` 작성 — candles 테이블 (symbol, timeframe, open_time, OHLC + volume nullable), UNIQUE(symbol, timeframe, open_time), CHECK 제약, RLS 2정책
-- [ ] **사용자 액션** — Supabase SQL Editor에서 `0002_candles.sql` 실행, 테이블·정책 생성 확인
+### 2-A. 데이터 모델 ✓ 완료 (2026-05-17)
+- [x] `worker/migrations/0002_candles.sql` — candles 테이블 (symbol, timeframe, open_time, OHLC + volume nullable), UNIQUE, CHECK, RLS 2정책
+- [x] Supabase SQL Editor 실행 — 정책 2건 검증 (candles_authenticated_select, candles_service_role_write)
 
-### 2-B. OHLCV 수집 잡 (워커)
-- [ ] CoinGecko `/coins/{id}/ohlc?days=N` 클라이언트 함수 작성
-- [ ] `worker/candle_poller.py` — 일 1회 잡, BTC/ETH/SOL 일봉 적재 (UPSERT)
-- [ ] GitHub Actions cron 또는 기존 워크플로에 통합 (별도 워크플로 권장 — 일 1회면 충분)
-- [ ] 로컬 1회 수동 실행 → Supabase 적재 확인
+### 2-B. OHLCV 수집 잡 (워커) ✓ 완료 (2026-05-17)
+- [x] CoinGecko `/coins/{id}/market_chart?interval=daily` 채택 (무료 plan ohlc는 일봉 미제공 → market_chart의 close+volume으로 대체. open/high/low=close)
+- [x] `worker/candle_poller.py` — 일 1회 잡, BTC/ETH/SOL UPSERT (on_conflict=symbol,timeframe,open_time)
+- [x] `.github/workflows/candle-poll.yml` — 매일 01:15 UTC
+- [x] workflow_dispatch 첫 실행 성공 — BTC/ETH/SOL 각 3행, 총 9건 적재 (run 25970172890, 22s)
 
-### 2-C. 공포·탐욕 지수
-- [ ] `worker/migrations/0003_fear_greed.sql` — fear_greed 테이블 (id, value, classification, captured_at) + RLS
-- [ ] `worker/fear_greed_poller.py` — Alternative.me `/fng/?limit=1` 호출, 일 1회 적재
-- [ ] GitHub Actions cron 또는 통합 잡
-- [ ] 프론트 — 헤더 또는 SummaryBox에 현재값 + 분류(Extreme Fear 등) 표시
+### 2-C. 공포·탐욕 지수 ✓ 완료 (2026-05-17)
+- [x] `worker/migrations/0003_fear_greed.sql` — fear_greed 테이블 (value, classification, captured_at UNIQUE), RLS 2정책
+- [x] Supabase SQL Editor 실행 — 정책 2건 검증
+- [x] `worker/fear_greed_poller.py` — Alternative.me `/fng/?limit=1`, captured_at upsert (멱등)
+- [x] `.github/workflows/fear-greed.yml` — 매일 01:00 UTC
+- [x] workflow_dispatch 첫 실행 성공 — value=31, classification='Fear', captured_at=2026-05-16 (run 25969876326, 21s)
+- [x] 프론트 — `frontend/src/lib/fearGreed.ts` + AppShell 헤더 위젯 (분류별 색상, hover 시 기준일 툴팁). 빌드 408.66KB / gzip 115.96KB
 
-### 2-D. RSI/MACD 계산
-- [ ] 계산 정책 결정 — 사전 계산 후 indicators 테이블 저장 vs view로 매번 계산. 일봉 빈도 낮으니 **사전 계산** 권장
-- [ ] `worker/migrations/0004_indicators.sql` — indicators 테이블 (symbol, timeframe, computed_at, rsi_14, macd, macd_signal, macd_hist)
-- [ ] `worker/indicators.py` — pandas/numpy로 RSI(14)·MACD(12/26/9) 계산
-- [ ] 캔들 적재 직후 indicators 갱신 (체이닝 또는 별도 잡)
+### 2-D. RSI/MACD 계산 ★ 검증 보류
+- [x] 계산 정책 — **사전 계산 후 indicators 테이블 저장** (일봉 빈도 낮음, view보다 단순)
+- [x] `worker/migrations/0004_indicators.sql` — indicators 테이블 (rsi_14, macd, macd_signal, macd_hist), UNIQUE, RLS 2정책
+- [x] `worker/indicators.py` — pandas로 RSI 14 / MACD 12,26,9, UPSERT
+- [x] `.github/workflows/indicators.yml` — 매일 01:30 UTC (candle-poll 직후)
+- [x] requirements.txt에 pandas 추가
+- [x] commit `115a859` 푸시
+- [ ] **사용자 액션 — Supabase SQL Editor에서 `0004_indicators.sql` 실행** (보류)
+- [ ] 사용자 SQL 실행 후 workflow_dispatch 자동 진행 + 결과 검증 (자동)
+- 비고: 현재 캔들 3행만 적재된 상태 → RSI 14·MACD 26+9는 데이터 부족으로 초기 NaN. 매일 누적되면서 의미 있는 값 도달.
 
-### 2-E. 프론트 차트 + 지표 UI
-- [ ] 차트 라이브러리 선택 — lightweight-charts(전문) vs recharts(범용). 캔들·라인·오버레이 모두 필요하면 lightweight-charts
+### 2-E. 프론트 차트 + 지표 UI ★ 진행 중
+- [x] 차트 라이브러리 선택 — **lightweight-charts** (TradingView, 캔들/라인/지표 모두 지원)
 - [ ] `frontend/src/lib/candles.ts` — Supabase 조회 헬퍼
-- [ ] `CandleChart` 컴포넌트 — 가격 캔들 + RSI·MACD 패널
-- [ ] 종목별 차트 모달 또는 라우팅 분기 (홀딩 클릭 → 차트)
+- [ ] `frontend/src/lib/indicatorsApi.ts` — RSI/MACD 조회 헬퍼
+- [ ] `CandleChart` 컴포넌트 — line chart (캔들은 OHLC=close라 단순화)
+- [ ] RSI / MACD 보조 패널
+- [ ] HoldingsList의 각 행에 "차트" 버튼 → 모달로 표시
 - [ ] "통계 표시 전용, 매매 신호 아님" 면책 문구
 
 ---
