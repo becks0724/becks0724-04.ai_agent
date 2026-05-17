@@ -1,10 +1,11 @@
-// 보유 자산 목록 테이블. 현재가/평가금액/손익 컬럼 + 인라인 수정/삭제.
+// 보유 자산 목록 테이블. 현재가/평가금액/손익 컬럼 + 인라인 수정/삭제 + 차트 모달.
 import { useState } from 'react'
 import { deleteHolding, updateHolding } from '../lib/holdings'
 import type { Holding } from '../lib/holdings'
 import type { PriceSnapshot } from '../lib/prices'
 import type { UsdKrwRate } from '../lib/fx'
 import { normalizeError } from '../lib/errors'
+import { ChartModal } from './ChartModal'
 
 type Props = {
   holdings: Holding[]
@@ -19,6 +20,7 @@ export function HoldingsList({ holdings, prices, fx, onChanged }: Props) {
   const [draftPrice, setDraftPrice] = useState('')
   const [busyId, setBusyId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [chartSymbol, setChartSymbol] = useState<string | null>(null)
 
   if (holdings.length === 0) {
     return <p style={styles.empty}>등록된 보유 자산이 없다. 위 폼에서 추가해라.</p>
@@ -174,6 +176,14 @@ export function HoldingsList({ holdings, prices, fx, onChanged }: Props) {
                     <>
                       <button
                         type="button"
+                        onClick={() => setChartSymbol(h.symbol)}
+                        disabled={busy}
+                        style={styles.actionGhost}
+                      >
+                        차트
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => startEdit(h)}
                         disabled={busy}
                         style={styles.actionGhost}
@@ -196,6 +206,9 @@ export function HoldingsList({ holdings, prices, fx, onChanged }: Props) {
           })}
         </tbody>
       </table>
+      {chartSymbol && (
+        <ChartModal symbol={chartSymbol} onClose={() => setChartSymbol(null)} />
+      )}
     </div>
   )
 }
