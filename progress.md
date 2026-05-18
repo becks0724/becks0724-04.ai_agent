@@ -95,24 +95,43 @@ session prop이 `App → AppShell`로, userId prop이 `AppShell → HoldingForm`
 
 ---
 
+## Stage 2 완료 요약 (2026-05-17 ~ 2026-05-18)
+
+### 2-A 데이터 모델
+`worker/migrations/0002_candles.sql`. candles 테이블 (symbol, timeframe, open_time, OHLC, volume nullable), UNIQUE(symbol,timeframe,open_time), CHECK(timeframe ∈ 6개), RLS 2정책.
+
+### 2-B 캔들 폴러
+`worker/candle_poller.py` + `.github/workflows/candle-poll.yml` (매일 01:15 UTC + workflow_dispatch days input). CoinGecko `/coins/{id}/market_chart?interval=daily` (무료 plan ohlc는 일봉 미제공이라 close+volume만 사용. open/high/low=close). 90일 백필 273행 적재 확인.
+
+### 2-C 공포·탐욕
+`worker/migrations/0003_fear_greed.sql` + `worker/fear_greed_poller.py` + `.github/workflows/fear-greed.yml` (매일 01:00 UTC). Alternative.me 무료, captured_at upsert 멱등. value=31 Fear 적재 확인. 프론트 — `lib/fearGreed.ts` + AppShell 헤더 위젯 (분류별 색상, hover 시 기준일).
+
+### 2-D RSI/MACD
+`worker/migrations/0004_indicators.sql` + `worker/indicators.py` + `.github/workflows/indicators.yml` (매일 01:30 UTC). pandas로 RSI 14·MACD 12/26/9 계산. 279행 적재 (BTC RSI 35.80 / ETH 23.84 oversold / SOL 41.86). PostgrestAPIError 메시지 상세화 (code/message/details/hint 분리).
+
+### 2-E 차트 모달
+`frontend/src/lib/candles.ts` + `frontend/src/lib/indicatorsApi.ts` + `frontend/src/components/ChartModal.tsx`. lightweight-charts v5.2 line chart + 최신 RSI/MACD 텍스트 + ESC 닫기 + 면책 문구. HoldingsList "차트" 버튼으로 호출. 빌드 576KB / gzip 171KB, 번들 보안 통과.
+
+---
+
 ## 다음 할 일 (다음 세션 시작 시)
 
-### Stage 1-E cron 발화 (잠정 결론)
-GitHub Actions Free plan의 schedule cron은 24h+ 0건 — 무료 plan의 알려진 best-effort 한계. workflow 자체는 정상(workflow_dispatch 3건 모두 성공). **잠정 결론**: 수동 트리거 + 사용자가 필요 시 발화. 다음 옵션은 사용자 의사 결정 필요:
-- 외부 cron-job.org (PAT 발급 필요)
-- Fly.io 무료 VM 이전 (장기 운영 시)
-- 현 상태 유지 (Stage 2까지 가격 fresh가 critical 아님)
+### 본 작업 — Stage 3 진입 (뉴스 수집) 또는 Stage 2.5 (강세장 정점 신호)
+사용자 선택. 추천 흐름은 Stage 3 (외부 API key 필요 최소, news 테이블 + RSS 파서가 자연스러운 다음 흐름).
 
-### 본 작업 — Stage 2 진입 (캔들 수집 + 기술적 지표 + 공포·탐욕)
-- 캔들 데이터 테이블 설계 (timeframe별)
-- 워커에 OHLCV 수집 잡 추가
-- RSI / MACD 계산 모듈 (Python, worker — CLAUDE.md §3 규칙)
-- Fear & Greed Index 적재 (Alternative.me 무료 또는 CMC API)
-- 프론트 차트 컴포넌트 (lightweight-charts 등)
-- 지표 오버레이 UI
+**Stage 3 진입 시 첫 작업**
+- 데이터 모델: `worker/migrations/0005_news.sql` — news 테이블 (id, source, title, url, published_at, raw_content) + news_ticker_map
+- 워커: CryptoPanic API 클라이언트 (free public posts 또는 free key 필요) + RSS 파서
+- 중복 제거: URL 해시 또는 콘텐츠 해시
+- 프론트: 보유 종목 필터링 뉴스 피드
 
-### 후속 — Stage 2.5 (강세장 정점 신호) 또는 Stage 3 (뉴스)
-- 사용자 선택. 백로그는 checklist.md `Stage 2.5` 섹션에 정리되어 있음.
+**Stage 2.5 진입 시 사전 액션**
+- 사용자 — CMC Pro Basic API key 발급 (무료, 10k credits/월)
+- 그 후: peak_signals 테이블, CMC Altcoin Season Index 어댑터, CoinGecko 자체 계산(Pi Cycle/200d MA 등) 18-23개 구현
+
+### 잔여 — cron schedule 발화
+- price-poll.yml `*/15` 자동 발화는 여전히 미관측. indicators.yml은 1건 관측됨(3.5h 지연)
+- GitHub Free best-effort 한계. 외부 cron(cron-job.org PAT) 또는 Fly.io 이전은 사용자 결정 보류
 
 ---
 
@@ -123,6 +142,18 @@ GitHub Actions Free plan의 schedule cron은 24h+ 0건 — 무료 plan의 알려
 ---
 
 ## 의사결정 로그
+
+### 2026-05-18 (Stage 2 완료)
+- **OHLCV 출처 — CoinGecko market_chart 채택, close 위주** — Why: CoinGecko 무료 plan의 `/coins/{id}/ohlc`는 days≥30에서 4일봉만 제공해 일봉 OHLC 미지원. `/coins/{id}/market_chart?interval=daily`는 prices(close)+total_volumes 제공. 진짜 일봉 OHLC가 필요해지면(Stage 2-D 차트 시각화 요구) Binance Klines 무료 API로 전환 옵션 보존. 현재는 open/high/low=close로 채워 NOT NULL 만족. RSI/MACD/Pi Cycle 등 close 기반 지표엔 영향 없음.
+- **공포·탐욕 출처 — Alternative.me 무료 (CMC 폴백)** — Why: 사용자가 CMC Pro key 미발급 상태. Alternative.me는 키 불필요. 향후 CMC 키 발급 시 Stage 2.5 백로그에서 CMC API로 교체 가능.
+- **차트 라이브러리 — lightweight-charts v5.2 채택** — Why: TradingView 제작, 캔들/라인/지표 모두 지원, 의존성 작음(170KB). 모달 방식 선택(라우터 의존성 미도입).
+- **candle-poll에 workflow_dispatch days input 추가** — Why: schedule trigger는 매일 days=2면 충분(어제·오늘 UPSERT)하지만, 백필 시 1회 large pull 필요. inputs.days로 manual override 가능. fallback은 '2'.
+- **RSI 14·MACD 12/26/9 — pandas 표준 EMA** — Why: 라이브러리 의존성 추가하지 않고 numpy/pandas만으로 계산. Wilder smoothing 대신 단순 rolling mean(많은 차트 도구의 디폴트와 일치).
+- **PostgrestAPIError 메시지 상세화** — Why: 첫 PGRST205 디버깅 시 `e!r`(repr)이 잘려 "Error PGRST205:"만 출력됨. code/message/details/hint 분리 출력으로 schema cache vs 테이블 미존재 판별 가능.
+
+### 2026-05-17 (auth 리팩토링 + Stage 2 진입)
+- **auth 리팩토링 — AuthProvider Context 패턴** — Why: session/userId prop drilling 제거, 깊은 자식이 useAuth() 직접 호출, signOut/error hook 노출. env vars silent fail → explicit throw로 "검은 화면" 방지.
+- **GitHub 저장소 리네임 — `04.ai_agent` → `becks0724-04.ai_agent`** — 사용자 측 GitHub UI 작업. 기존 URL은 자동 redirect로 호환. local remote URL은 그대로 두고 GitHub 리다이렉트 활용.
 
 ### 2026-05-16
 - **워커 호스팅 — GitHub Actions cron 채택 (2026-05-17)** — Why: 비용 0, Public/private repo 무료 한도(2000분/월) 충분, 30초→5분 폴링이 MVP에 부족하지 않음, 기존 GitHub 인프라 외 추가 도입 없음. Railway 유료/Render/Fly 모두 후순위 후보로 남김. 보안 조건 5/5 충족(private repo + 2FA + Passkey + secrets-as-env + 공식 actions만).
@@ -142,4 +173,8 @@ GitHub Actions Free plan의 schedule cron은 24h+ 0건 — 무료 plan의 알려
 
 ## 미해결 질문
 - 빈 `becks0724/crypto-monitoring` GitHub 저장소를 삭제할지 그대로 둘지 결정 필요. 작업 영향 없음. 삭제 시 `gh repo delete becks0724/crypto-monitoring --yes` (필요 시 `gh auth refresh -h github.com -s delete_repo` 선행).
-- GitHub Actions cron `*/15` 자동 발화가 1.5시간+ 미관측 상태로 세션 종료. 다음 세션 시작 시점에 누적 확인. 다수 누적 = 정상, 여전히 0건 = 외부 cron(cron-job.org) 또는 Fly.io 검토.
+- GitHub Actions cron 자동 발화 — indicators.yml은 1건 관측(3.5h 지연), price-poll.yml `*/15`은 여전히 0건 누적. 매일 cron(`0/15/30 1 * * *`)은 schedule 발화율이 더 높을 가능성 있음 — 다음 세션에서 fear-greed/candle-poll/indicators의 schedule 발화 추가 관측 여부 확인.
+- 사용자 액션 (Stage 3 또는 2.5 진입 시):
+  - Stage 2.5 진입 시: CMC Pro Basic API key 발급 (무료, 10k credits/월)
+  - Stage 3 진입 시: CryptoPanic 무료 키 발급 가능 (public posts는 키 없이 가능, 키 발급 시 더 많은 endpoint 사용 가능)
+- ChartModal prod 시각 검증 — `crypto-monitoring-one.vercel.app` 새로고침해서 HoldingsList "차트" 버튼 → 90일 line chart + RSI/MACD 텍스트 확인. 본 세션에서는 코드만 푸시·CLI 검증, 사용자 브라우저 검증은 미진행.
