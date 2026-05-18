@@ -126,8 +126,12 @@ def parse_classification(text: str) -> dict | None:
     return {"sentiment": sent, "event_category": cat, "confidence": conf_f}
 
 
+class FatalApiError(Exception):
+    """credit 부족·인증 실패 등 재시도가 무의미한 영구 오류. 호출 측에서 잡아 전체 배치 abort."""
+
+
 def classify_one(client: anthropic.Anthropic, model: str, title: str, summary: str) -> dict | None:
-    """1건 분류. 지수 백오프 재시도. 성공 시 dict, 실패 시 None."""
+    """1건 분류. 일시적 오류만 재시도. 영구 오류(400 BadRequest, 401 Auth)는 FatalApiError raise."""
     prompt = PROMPT_TEMPLATE.format(title=title[:300], summary=summary[:1000])
     last_exc: Exception | None = None
     for attempt in range(1, MAX_RETRIES + 1):
@@ -146,6 +150,9 @@ def classify_one(client: anthropic.Anthropic, model: str, title: str, summary: s
                 print(f"[classifier] parse failed for title={title[:40]!r}: raw={text[:200]!r}", flush=True)
                 return None
             return parsed
+        except (anthropic.BadRequestError, anthropic.AuthenticationError, anthropic.PermissionDeniedError) as e:
+            # credit 부족 / invalid key / 권한 — retry 무의미. 호출 측이 전체 abort 결정.
+            raise FatalApiError(str(e)) from e
         except anthropic.RateLimitError as e:
             last_exc = e
             wait = BACKOFF_BASE_SECONDS ** attempt
@@ -193,7 +200,12 @@ def run_once(supabase: Client, client: anthropic.Anthropic, model: str, batch: i
             break
         title = row.get("title") or ""
         summary = strip_html(row.get("raw_content"))
-        result = classify_one(client, model, title, summary)
+        try:
+            result = classify_one(client, model, title, summary)
+        except FatalApiError as e:
+            # credit balance / invalid key — 더 시도해도 무의미. 배치 즉시 중단.
+            print(f"[classifier] FATAL abort batch: {e}", flush=True)
+            break
         if result is None:
             continue
         ok = upsert_classification(supabase, row["id"], result, model)
