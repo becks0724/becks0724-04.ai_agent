@@ -14,9 +14,11 @@
   - 2-C 공포·탐욕 지수 (Alternative.me 무료, 일 1회. 헤더 위젯 — 분류별 색상)
   - 2-D RSI 14 / MACD 12,26,9 (pandas, `indicators` 테이블 279행 적재). BTC RSI 35.80 / ETH 23.84 / SOL 41.86.
   - 2-E 차트 모달 (lightweight-charts v5.2, line chart + 최신 RSI/MACD 텍스트, ESC 닫기, 면책 문구). HoldingsList "차트" 버튼으로 호출.
-- **Stage 3 코드 완료, 검증 대기** — RSS 4 sources(CoinDesk/Cointelegraph/Bitcoin Magazine/Decrypt) 폴러 + `news`/`news_ticker_map` 모델(0005 SQL) + `ticker_matcher`(키워드 17개 → 13 심볼, link/ton/dot 단독 제외) + NewsFeed UI(보유/전체 탭, 5분 polling) + `news-poll.yml`(매시간 :05 UTC). 사용자 SQL 실행 + workflow_dispatch 검증 보류.
-- **워커 호스팅** — GitHub Actions cron 5개 워크플로 (price-poll 15분, fear-greed 01:00 UTC, candle-poll 01:15, indicators 01:30, news-poll 매시간 :05). schedule 자동 발화는 일 1회 워크플로 3개 각 1건씩 관측 (5/17 04-05 UTC, ~3.5h 지연). price-poll(15분)은 실제 ~1시간 간격 발화. 모든 workflow_dispatch는 정상.
-- **다음 본 작업** — Stage 3 검증 완료 후 Stage 4(LLM 감성) 또는 Stage 2.5(강세장 정점, CMC API key 발급 필요).
+- **Stage 3 뉴스 완료 (검증 통과)** — RSS 4 sources(CoinDesk/Cointelegraph/Bitcoin Magazine/Decrypt) + `news`/`news_ticker_map` 모델 + `ticker_matcher` + NewsFeed UI + `news-poll.yml` 매시간 :05 UTC. **첫 적재 102 entries / 69 ticker_links 검증 완료**.
+- **Stage 2.6 coins_catalog + 동적 모드 완료** — `coins_catalog` 5000위(0006 SQL + pass1/2 rate limit 대응 폴러). price/candle/indicators 모두 POLL_SYMBOLS 비어있으면 portfolio_holdings 기반 동적 매핑(catalog 우선 → 정적 fallback). HoldingForm datalist 자동완성. FET 알트 추가 → 4 워크플로 모두 정상 동작 검증.
+- **ChartModal fix** — UTCTimestamp+dedup으로 line 렌더링 안정화, MACD 값 가변 정밀도 표시.
+- **워커 호스팅** — GitHub Actions cron 6개 워크플로 (price-poll 15분, fear-greed 01:00, candle-poll 01:15, indicators 01:30, news-poll 매시간 :05, **coins-catalog 02:00**). 모든 workflow_dispatch 성공. price/candle/indicators는 동적 심볼 모드 기본.
+- **다음 본 작업** — Stage 4(LLM 감성, Anthropic key 필요) 또는 Stage 2.5(강세장 정점, CMC key 필요).
 - 세부 진행 사항은 `progress.md`, 작업 단위 체크리스트는 `checklist.md`.
 
 ## 기술 스택
@@ -29,23 +31,26 @@
 ```
 04.ai_agent/
 ├── .github/workflows/
-│   ├── price-poll.yml       # */15 * * * * 가격 폴러
+│   ├── price-poll.yml       # */15 * * * * 가격 폴러 (동적 모드)
 │   ├── fear-greed.yml       # 0 1 * * * 공포·탐욕 폴러
-│   ├── candle-poll.yml      # 15 1 * * * 일봉 폴러 (workflow_dispatch days input)
-│   ├── indicators.yml       # 30 1 * * * RSI/MACD 계산
-│   └── news-poll.yml        # 5 * * * * RSS 4 sources 뉴스 폴러 (workflow_dispatch feeds input)
+│   ├── candle-poll.yml      # 15 1 * * * 일봉 폴러 (workflow_dispatch days input, 동적 모드)
+│   ├── indicators.yml       # 30 1 * * * RSI/MACD 계산 (동적 모드)
+│   ├── news-poll.yml        # 5 * * * * RSS 4 sources 뉴스 폴러
+│   └── coins-catalog.yml    # 0 2 * * * 시총 5000위 메타데이터 (workflow_dispatch total input)
 ├── frontend/                # React + Vite TS (Vercel 배포)
-│   ├── src/lib/             # supabase, useAuth(AuthContext), holdings, prices, fx, errors, fearGreed, candles, indicatorsApi, news
-│   └── src/components/      # Login, AppShell, HoldingForm, HoldingsList, ChartModal, NewsFeed
+│   ├── src/lib/             # supabase, useAuth(AuthContext), holdings, prices, fx, errors, fearGreed, candles, indicatorsApi, news, coins
+│   └── src/components/      # Login, AppShell, HoldingForm(자동완성), HoldingsList, ChartModal, NewsFeed
 ├── worker/                  # Python 3.11
-│   ├── price_poller.py      # CoinGecko /simple/price
+│   ├── price_poller.py      # CoinGecko /simple/price (동적 모드)
 │   ├── fear_greed_poller.py # Alternative.me /fng
-│   ├── candle_poller.py     # CoinGecko /coins/{id}/market_chart
-│   ├── indicators.py        # pandas RSI/MACD
+│   ├── candle_poller.py     # CoinGecko /coins/{id}/market_chart (동적 모드)
+│   ├── indicators.py        # pandas RSI/MACD (동적 모드)
 │   ├── news_poller.py       # RSS 4 sources (CoinDesk/Cointelegraph/Bitcoin Magazine/Decrypt)
 │   ├── ticker_matcher.py    # 뉴스 본문 → 심볼 키워드 매칭
-│   ├── coingecko_ids.py     # 심볼 → coingecko_id 매핑 (15종)
-│   └── migrations/          # 0001_init / 0002_candles / 0003_fear_greed / 0004_indicators / 0005_news
+│   ├── coins_catalog_poller.py # CoinGecko /coins/markets 5000위 적재 (pass1/2 재시도)
+│   ├── symbol_resolver.py   # portfolio_holdings → coins_catalog 동적 매핑
+│   ├── coingecko_ids.py     # 심볼 → coingecko_id 정적 매핑 (15종, fallback용)
+│   └── migrations/          # 0001_init / 0002_candles / 0003_fear_greed / 0004_indicators / 0005_news / 0006_coins_catalog
 ├── CLAUDE.md
 ├── checklist.md
 └── progress.md

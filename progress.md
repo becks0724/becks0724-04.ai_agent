@@ -4,24 +4,22 @@
 
 ---
 
-## 현재 상태 (2026-05-18 KST 추가)
-**Stage 3 코드 완료 — 사용자 SQL 실행 + workflow_dispatch 검증 대기.** RSS 4 소스(CoinDesk/Cointelegraph/Bitcoin Magazine/Decrypt) 폴러 + news/news_ticker_map 모델 + 보유 종목 필터링 NewsFeed UI까지 한 묶음으로 push 완료(`8f46eae`+`b78601c`). 코드 dry-run에서 3소스 92 entries 파싱 + 심볼 매칭(BTC/ETH/SOL/USDC 등) 정상 검증. **남은 사용자 액션** — `worker/migrations/0005_news.sql` Supabase SQL Editor 실행. 그 다음 `gh workflow run news-poll.yml`로 적재 검증. cron 누적: candle/indicators/fear-greed 각 schedule 1건 관측(5/17 04-05 UTC, 동일한 ~3.5h 지연), price-poll(15분 cron)은 실제 ~1시간 간격으로만 발화 — GitHub Free best-effort 한계 재확인.
+## 현재 상태 (2026-05-18 KST 추가, 본 세션 누적 commit 9건)
+**Stage 3 적재 검증 완료 + coins_catalog 5000위 도입 + 워커 동적 모드 + ChartModal 렌더링 fix.** 본 세션 핵심 — (1) Stage 3 news-poll 워크플로 검증 통과 (102 entries, 69 ticker_links), (2) coins_catalog 테이블 + 폴러 + 시총 5000개 적재 (pass1/2 구조로 rate limit 대응), (3) price/candle/indicators 폴러가 POLL_SYMBOLS 비어있으면 portfolio_holdings 기반 동적 모드, (4) HoldingForm 심볼 자동완성 datalist, (5) FET 4번째 심볼로 추가하고 4 워크플로 모두 동적 매핑 검증, (6) ChartModal line 시리즈가 BusinessDay key 중복으로 안 그려지던 문제를 UTCTimestamp+dedup으로 해결 + 작은 MACD 값 표시 정밀도 가변. 다음 분기점: Stage 4(LLM 감성, key 필요) 또는 Stage 2.5(강세장 정점, CMC key 필요).
 
 | 영역 | 상태 | 비고 |
 |---|---|---|
 | 로컬 스캐폴드 | ✓ | frontend (Vite+TS) / worker (Python 3.11) |
 | GitHub | ✓ | `becks0724/becks0724-04.ai_agent` (**public**, main). 2FA + Passkey 활성 |
-| Supabase | ✓ | Singapore region, `plpkmaqyrqkjqnvnqexe.supabase.co`. 테이블 5종 (portfolio_holdings, price_snapshots, candles, fear_greed, **indicators 대기**) |
-| Vercel | ✓ | `https://crypto-monitoring-one.vercel.app`, env vars 등록, end-to-end 통과. AuthContext + 공포·탐욕 헤더 위젯 |
-| 워커 호스팅 | ✓ 설정 / ⚠ schedule 미발화 | GitHub Actions 4 워크플로 (price-poll 15분, fear-greed 01:00 UTC, candle-poll 01:15, indicators 01:30). workflow_dispatch는 모두 성공. schedule 자동 발화는 24h+ 0건 — GitHub Free best-effort 한계로 잠정 결론 |
-| auth 리팩토링 | ✓ | AuthContext 도입, prop drilling 제거, signOut/error 노출, env throw. 커밋 `74ccac6` 푸시 → Vercel 자동 배포 |
-| Stage 2-A 캔들 모델 | ✓ | `candles` 테이블, RLS 2정책, UNIQUE(symbol,timeframe,open_time) |
-| Stage 2-B 캔들 폴러 | ✓ | CoinGecko `/coins/{id}/market_chart?interval=daily`, close+volume, open/high/low=close. 9건 적재 확인 |
-| Stage 2-C 공포·탐욕 | ✓ | Alternative.me 무료, value=31 Fear 적재. AppShell 헤더 위젯 (분류별 색상) |
-| Stage 2-D 지표 | ✓ | RSI 14·MACD 12/26/9 pandas. 279행 적재 (BTC RSI 35.80, ETH 23.84, SOL 41.86). candle 90일 백필 옵션 추가 |
-| Stage 2-E 차트 UI | ✓ | lightweight-charts v5.2 모달, line chart + 최신 RSI/MACD 텍스트, ESC 닫기, 면책 문구. HoldingsList "차트" 버튼 |
-| Stage 3 뉴스 (코드) | ✓ | RSS 4 sources + ticker_matcher(키워드 17개→13 심볼) + news/news_ticker_map(0005 SQL) + NewsFeed(보유/전체 탭) + news-poll.yml(매시간 :05 UTC) |
-| Stage 3 뉴스 (검증) | ⏳ | 0005 SQL **사용자 액션 보류**. 그 후 workflow_dispatch news-poll로 적재 검증 |
+| Supabase | ✓ | Singapore region. 테이블 8종 (portfolio_holdings, price_snapshots, candles, fear_greed, indicators, news, news_ticker_map, **coins_catalog**) |
+| Vercel | ✓ | `https://crypto-monitoring-one.vercel.app`, end-to-end 통과. AuthContext + 공포·탐욕 + NewsFeed + HoldingForm 자동완성 |
+| 워커 호스팅 | ✓ | GitHub Actions 6 워크플로 (price-poll 15분, fear-greed 01:00, candle-poll 01:15, indicators 01:30, news-poll 매시간 :05, coins-catalog 02:00). 모든 workflow_dispatch 성공. price/candle/indicators는 동적 모드 — POLL_SYMBOLS 미지정 시 portfolio_holdings에서 자동 |
+| auth 리팩토링 | ✓ | AuthContext 도입, prop drilling 제거, signOut/error 노출, env throw |
+| Stage 2-A~E | ✓ | candles/fear_greed/indicators + ChartModal (lightweight-charts v5.2, UTCTimestamp+dedup으로 line 안정화, 가변 정밀도 표시) |
+| Stage 3 뉴스 | ✓ | RSS 4 sources + ticker_matcher + news/news_ticker_map. **검증 완료** — 102 entries / 69 ticker_links (coindesk 25/14, cointelegraph 30/25, bitcoinmagazine 10/10, decrypt 37/20) |
+| coins_catalog 5000위 | ✓ | 0006 SQL + coins_catalog_poller (per_page 250 × 20 + pass1/2 rate limit 대응). 적재 5000/5000. price/candle/indicators가 catalog 우선 매핑 → 정적 fallback(15종) |
+| HoldingForm 자동완성 | ✓ | datalist + 200ms 디바운스 검색 (symbol/name ilike, rank 정렬 상위 30) |
+| FET 검증 사례 | ✓ | 사용자가 FET 보유 추가 → price 4건/candle 91×4=364행/indicators 374행(RSI 42.575/MACD -0.0048). 동적 매핑 모든 단계 통과 |
 
 ---
 
@@ -118,21 +116,28 @@ session prop이 `App → AppShell`로, userId prop이 `AppShell → HoldingForm`
 
 ## 다음 할 일 (다음 세션 시작 시)
 
-### Stage 3 검증 (가장 시급 — 사용자 액션 + 워커 트리거)
-1. **사용자 액션** — Supabase SQL Editor에서 `worker/migrations/0005_news.sql` 실행. news (url unique) + news_ticker_map (composite PK) + RLS 각 2정책 생성 확인.
-2. `gh workflow run news-poll.yml` → 적재 검증
-   - 기대값: news 수십-수백 행 (RSS 4 sources × 20-30 entries), news_ticker_map은 매칭 심볼 수만큼
-   - 검증 쿼리: `select source, count(*) from news group by source;` / `select symbol, count(*) from news_ticker_map group by symbol order by 2 desc;`
-3. prod URL 시각 검증 — `crypto-monitoring-one.vercel.app`에서 NewsFeed "보유 종목" / "전체" 탭 동작 확인.
-
 ### 본 작업 — Stage 4 (LLM 감성 분석) 또는 Stage 2.5 (강세장 정점 신호)
-Stage 3 검증 완료 후 분기점. 추천: Stage 4 (RSS 적재된 뉴스에 LLM 분류 백필 — 자연스러운 흐름).
-- **Stage 4 사전 액션** — Anthropic / OpenAI API key 발급 (사용자)
-- **Stage 2.5 사전 액션** — CMC Pro Basic API key 발급 (무료, 10k credits/월)
+Stage 3 적재 + catalog 5000위 + FET 검증 완료 상태. 추천 흐름은 **Stage 4** (이미 news 테이블에 102건이 적재돼 있어 LLM 분류 백필이 자연스러움).
+
+**Stage 4 진입 시 첫 작업**
+- 사용자 액션 — Anthropic API key 발급 (Claude Haiku 4.5 추천: 비용 최저, 분류 충분)
+- 데이터 모델: `worker/migrations/0007_news_classifications.sql` — sentiment(긍정/중립/부정), event_category(상장/규제/해킹/파트너십/일반), confidence, model_id, classified_at
+- 워커: `worker/news_classifier.py` — 미분류 news 배치 처리, 프롬프트 구조 (제목+본문 50자 → JSON 응답)
+- 백필 잡 + 신규 뉴스 trigger
+- 프론트: NewsFeed 항목에 감성 배지 + 이벤트 태그
+
+**Stage 2.5 진입 시 사전 액션**
+- 사용자 — CMC Pro Basic API key 발급 (무료, 10k credits/월)
+- 그 후: peak_signals 테이블, CMC Altcoin Season Index 어댑터, CoinGecko 자체 계산 18-23개
+
+### 단기 잔여
+- prod URL 시각 검증 — ChartModal FET line 표시 (`5383e69` 배포 후 확인)
+- cron schedule 발화 모니터링 — 본 세션 5/17 04-05 UTC 1건씩 관측 후 추가 누적
+- 빈 `becks0724/crypto-monitoring` 저장소 삭제 결정 (작업 영향 없음)
 
 ### 잔여 — cron schedule 발화
-- price-poll.yml `*/15` 실제 발화 간격은 ~1시간(자동 발화는 되나 빈도가 cron보다 낮음)
-- 일 1회 워크플로 3건(fear-greed/candle/indicators)은 모두 schedule 1건씩 관측되었으나 예약 시각 대비 ~3.5h 지연
+- price-poll.yml `*/15` 실제 발화 간격은 ~1시간 (자동 발화는 되나 빈도가 cron보다 낮음)
+- 일 1회 워크플로 3건(fear-greed/candle/indicators)은 모두 schedule 1건씩 관측 (예약 시각 대비 ~3.5h 지연)
 - GitHub Free best-effort 한계. 외부 cron(cron-job.org PAT) 또는 Fly.io 이전은 사용자 결정 보류
 
 ---
@@ -144,6 +149,14 @@ Stage 3 검증 완료 후 분기점. 추천: Stage 4 (RSS 적재된 뉴스에 LL
 ---
 
 ## 의사결정 로그
+
+### 2026-05-18 (catalog 5000위 + 동적 모드 + ChartModal fix)
+- **coins_catalog 도입 — symbol 동적 매핑** — Why: 사용자가 FET를 보유 추가했을 때 워커가 시세를 못 가져옴. 정적 `coingecko_ids.py` 15종 한계. CoinGecko `/coins/markets`로 시총 5000위 메타데이터를 일 1회 적재하고 portfolio_holdings에서 unique symbol 추출 후 catalog로 id 해소. 사용자가 자유롭게 추가해도 워커가 자동 따라감.
+- **pass1/pass2 재시도 구조** — Why: CoinGecko 무료 plan에서 1.5초 page sleep으론 20페이지 중 8페이지가 429로 누락(첫 dispatch 3000/5000). page_sleep 4초 + 429 백오프 4/16/64s + pass1 후 누락 페이지만 60s cooldown 후 1회 재시도하면 5000/5000 완주(7m13s). CoinGecko 분당 호출 한도(~30)에 안전한 마진.
+- **워커 동적 모드 — POLL_SYMBOLS 비어있으면 portfolio_holdings** — Why: price/candle/indicators 모두 .yml의 `POLL_SYMBOLS: BTC,ETH,SOL` 고정값이 동적 매핑을 막고 있었음. workflow env에서 변수 제거 → portfolio_holdings 동적 조회 → coins_catalog 우선 해소 → 정적 fallback(15종) 순. backward 호환 유지(POLL_SYMBOLS env 있으면 우선).
+- **HoldingForm 자동완성 — HTML5 datalist** — Why: 5000위까지 지원하려면 텍스트 입력만으론 불편. datalist는 의존성 0이고 200ms 디바운스 검색으로 catalog ilike 매핑 충분. dropdown 라이브러리는 과잉.
+- **ChartModal — UTCTimestamp + dedup으로 line 안정화** — Why: `slice(0,10)` 'YYYY-MM-DD' 키가 BusinessDay로 해석돼 동일 일자에 시각이 다른 candle(과거 dispatch + 백필 시각 불일치) 중복 시 시리즈가 invalid → FET 차트 빈 그리드만 표시. UTCTimestamp(초) + Map dedup으로 모든 row 별개 point. 추가로 fmt 가변 정밀도(|v|에 따라 toFixed 2/3/4/6)로 FET MACD -0.0048 같은 작은 값이 "-0.00"으로 보이지 않게.
+- **price-poll/candle-poll/indicators .yml 환경변수 정리** — POLL_SYMBOLS 제거 + AppShell 경고 문구 "POLL_SYMBOLS 추가 필요" → "다음 사이클 자동 적재. catalog 미등록 심볼이면 비어있을 수 있음"으로 갱신.
 
 ### 2026-05-18 (Stage 3 코드 완료)
 - **Stage 3 출처 — RSS 우선, CryptoPanic 보류** — Why: RSS 4종(CoinDesk/Cointelegraph/Bitcoin Magazine/Decrypt)은 키 불필요. CryptoPanic은 무료 키 발급이 필요해 사용자 액션 발생. RSS 적재 검증 후 CryptoPanic 어댑터를 옵션으로 추가하는 게 자연스러운 흐름.

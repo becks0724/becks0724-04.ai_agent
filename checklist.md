@@ -207,12 +207,40 @@
 - [x] 뉴스 저장 테이블 설계 — `worker/migrations/0005_news.sql` (news.url UNIQUE + news_ticker_map composite PK, 각 RLS 2정책)
 - [x] 본문에서 티커 추출 → 매핑 테이블 — `worker/ticker_matcher.py` 키워드 dict 17개 → 13 심볼 매핑
 - [x] 중복 뉴스 제거 — news.url UNIQUE 제약 + supabase upsert(on_conflict=url)
-- [x] 프론트 뉴스 피드 UI — 보유 종목 필터링 — `frontend/src/lib/news.ts` + `NewsFeed.tsx` (보유/전체 탭, 5분 polling). 빌드 580KB / gzip 171.87KB
+- [x] 프론트 뉴스 피드 UI — 보유 종목 필터링 — `frontend/src/lib/news.ts` + `NewsFeed.tsx` (보유/전체 탭, 5분 polling)
 - [x] GitHub Actions — `.github/workflows/news-poll.yml` (cron `5 * * * *` + workflow_dispatch feeds input)
+- [x] **검증 완료 (2026-05-18)** — 0005 SQL 실행 + workflow_dispatch news-poll → 102 entries / 69 ticker_links 적재 (coindesk 25/14, cointelegraph 30/25, bitcoinmagazine 10/10, decrypt 37/20)
 - [~] CryptoPanic API 클라이언트 (worker) — **보류**. 사용자 키 발급 후 별도 폴러 또는 news_poller에 어댑터 추가
-- [ ] **사용자 액션** — Supabase SQL Editor에서 `worker/migrations/0005_news.sql` 실행
-- [ ] workflow_dispatch news-poll → Supabase `news` 적재 + `news_ticker_map` 매핑 검증
 - [ ] prod URL 시각 검증 — NewsFeed 보유 종목 탭/전체 탭 동작 확인
+
+---
+
+## Stage 2.6 · coins_catalog 5000위 + 워커 동적 모드 ✓ 완료 (2026-05-18)
+
+> 설계 결정 (2026-05-18)
+> - 동기 — 사용자가 FET 등 알트코인을 추가했을 때 워커가 시세를 못 가져옴. 정적 `coingecko_ids.py` 15종 한계.
+> - **출처** — CoinGecko `/coins/markets?per_page=250&page=1..20` (시총 5000위, 일 1회 갱신).
+> - **rate limit 대응** — page_sleep 4초 + 백오프 4/16/64s + pass1 후 누락 페이지만 60s cooldown 후 pass2 재시도.
+> - **심볼 매핑** — coins_catalog로 우선 해소 → 정적 `coingecko_ids` fallback. 같은 심볼이 여러 코인에 있으면 `market_cap_rank` 최저(=상위) 1개 자동 채택.
+> - **워커 동적 모드** — POLL_SYMBOLS 환경변수 비어있으면 portfolio_holdings에서 unique symbol 조회. backward 호환 유지.
+
+- [x] `worker/migrations/0006_coins_catalog.sql` — coingecko_id PK + 인덱스 4종(rank/symbol+rank/lower(symbol)/lower(name)) + RLS 2정책
+- [x] `worker/coins_catalog_poller.py` — pass1/pass2 구조, CATALOG_TOTAL/PER_PAGE/PAGE_SLEEP/RETRY_COOLDOWN env
+- [x] `worker/symbol_resolver.py` — fetch_active_symbols + resolve_via_catalog (rank 최저 자동 선택)
+- [x] `.github/workflows/coins-catalog.yml` — cron `0 2 * * *` + workflow_dispatch total input
+- [x] price/candle/indicators 워커 — POLL_SYMBOLS 비어있으면 동적 모드. 카탈로그 우선 → 정적 fallback. price chunk_size + candle symbol_sleep 옵션 추가
+- [x] price-poll/candle-poll/indicators .yml — POLL_SYMBOLS 환경변수 제거 (동적 모드 기본)
+- [x] `frontend/src/lib/coins.ts` — fetchTopCoins / searchCoins (ilike symbol or name, rank 정렬 limit 30)
+- [x] `HoldingForm.tsx` — 자동완성 datalist + 200ms 디바운스
+- [x] AppShell 경고 문구 갱신 — 동적 모드 시대에 맞게
+- [x] **검증 (2026-05-18)** — coins-catalog 워크플로 5000/5000 적재 (pass1 4250 + pass2 750, 7m13s). FET 추가 후 price/candle/indicators 모두 동적 모드 정상: active_symbols=['BTC','ETH','FET','SOL'], 4건/364행/374행 적재.
+
+---
+
+## Stage 2-E 차트 fix (2026-05-18)
+
+- [x] ChartModal line 시리즈 — UTCTimestamp + ts 기준 dedup으로 BusinessDay 키 중복 문제 해결 (FET 빈 그리드 → line 표시)
+- [x] fmt 가변 정밀도 — |v|에 따라 toFixed 2/3/4/6. FET MACD -0.0048이 "-0.00"으로 표시되던 문제 해결
 
 ---
 
