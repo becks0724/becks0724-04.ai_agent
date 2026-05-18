@@ -1,11 +1,12 @@
-# 미분류 news를 Anthropic Claude Haiku 4.5로 sentiment + event_category 분류해 news_classifications에 적재한다.
+# 미분류 news를 Google Gemini 2.5 Flash로 sentiment + event_category 분류해 news_classifications에 적재한다.
 # 가격 예측은 절대 수행하지 않음 — 감성·통계 표시 전용.
 #
 # 환경변수 (worker/.env 또는 GitHub Actions Secrets)
 #   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY  — Supabase 클라이언트
-#   ANTHROPIC_API_KEY                        — Claude API key
-#   CLASSIFY_BATCH_SIZE                      — 1회 처리할 미분류 건수 (기본 25)
-#   CLASSIFY_MODEL                           — 모델 ID (기본 claude-haiku-4-5-20251001)
+#   GOOGLE_API_KEY                           — Google AI Studio key (https://aistudio.google.com/app/apikey)
+#   CLASSIFY_BATCH_SIZE                      — 1회 처리할 미분류 건수 (기본 10, Gemini 무료 일 250건 안전)
+#   CLASSIFY_MODEL                           — 모델 ID (기본 gemini-2.5-flash)
+#   CLASSIFY_CALL_SLEEP_SECONDS              — 호출 간 sleep (기본 6초, 분당 10 RPM 안전)
 #   POLL_ONCE                                — "1"이면 1회 실행 후 종료
 #   POLL_INTERVAL_SECONDS                    — 무한 루프 시 간격 (기본 3600)
 #
@@ -21,18 +22,32 @@ import sys
 import time
 from datetime import datetime, timezone
 
-import anthropic
 from dotenv import load_dotenv
+from google import genai
+from google.genai import errors as genai_errors
+from google.genai import types as genai_types
 from supabase import Client, create_client
 
-DEFAULT_MODEL = "claude-haiku-4-5-20251001"
-DEFAULT_BATCH = 25
-MAX_TOKENS = 200
+DEFAULT_MODEL = "gemini-2.5-flash"
+DEFAULT_BATCH = 10
+DEFAULT_CALL_SLEEP = 6.0
+MAX_TOKENS = 300
 MAX_RETRIES = 3
-BACKOFF_BASE_SECONDS = 2.0
+BACKOFF_BASE_SECONDS = 4.0
 
 SENTIMENTS = {"positive", "neutral", "negative"}
 EVENT_CATEGORIES = {"listing", "regulation", "hack", "partnership", "tech", "general"}
+
+# Gemini 영구 오류 식별 키워드 (case-insensitive). 부분일치로 검색.
+FATAL_HINTS = (
+    "api key not valid",
+    "invalid api key",
+    "permission denied",
+    "quota exceeded",
+    "billing",
+    "unauthenticated",
+    "user location is not supported",
+)
 
 PROMPT_TEMPLATE = """다음 암호화폐 뉴스를 분류해라. JSON 한 객체로만 응답하고 다른 텍스트는 금지.
 
@@ -48,7 +63,7 @@ PROMPT_TEMPLATE = """다음 암호화폐 뉴스를 분류해라. JSON 한 객체
 
 판단 가이드:
 - sentiment — 코인/시장 전반에 호재면 positive, 악재면 negative, 모호하거나 단순 보도면 neutral.
-- event_category — 상장/추가 listing, 규제·소송·정책 regulation, 해킹·익스플로잇·해킹사건 hack, 파트너십·통합·투자유치 partnership, 기술·업그레이드·신제품 tech, 그 외 general.
+- event_category — 상장/추가 listing, 규제·소송·정책 regulation, 해킹·익스플로잇 hack, 파트너십·통합·투자유치 partnership, 기술·업그레이드·신제품 tech, 그 외 general.
 - 매매 신호로 해석하지 않는다. 통계 표시 전용.
 """
 
@@ -62,10 +77,12 @@ def _request_shutdown(signum: int, _frame) -> None:
     print(f"[classifier] received signal {signum}, will exit after current batch", flush=True)
 
 
+class FatalApiError(Exception):
+    """key 만료·결제·권한 등 retry가 무의미한 영구 오류. 호출 측에서 catch해 배치 abort."""
+
+
 def fetch_pending_news(supabase: Client, limit: int) -> list[dict]:
-    """news_classifications에 없는 news 미분류 건을 최신순 limit개 가져온다.
-    PostgREST는 LEFT JOIN NOT EXISTS를 직접 지원하지 않으니 클라이언트에서 차집합 처리."""
-    # 1) 후보 news 최신순 (limit의 5배 정도로 여유 확보 — 이미 분류된 항목 제외하기 위해)
+    """news_classifications에 없는 news 미분류 건을 최신순 limit개 가져온다."""
     pool = max(limit * 5, 100)
     res_news = (
         supabase.table("news")
@@ -92,7 +109,6 @@ def fetch_pending_news(supabase: Client, limit: int) -> list[dict]:
 
 
 def strip_html(text: str | None) -> str:
-    """HTML 태그를 제거한 평문 반환. summary에 종종 HTML이 섞여 있어 토큰 절약 차원."""
     if not text:
         return ""
     no_tag = re.sub(r"<[^>]+>", " ", text)
@@ -100,10 +116,8 @@ def strip_html(text: str | None) -> str:
 
 
 def parse_classification(text: str) -> dict | None:
-    """LLM 응답 텍스트에서 JSON 객체를 추출해 스키마 검증 후 dict 반환. 실패 시 None."""
     if not text:
         return None
-    # 첫 '{' 와 마지막 '}' 사이 추출 — 모델이 가끔 설명을 덧붙여도 안전.
     start = text.find("{")
     end = text.rfind("}")
     if start == -1 or end == -1 or end <= start:
@@ -126,42 +140,56 @@ def parse_classification(text: str) -> dict | None:
     return {"sentiment": sent, "event_category": cat, "confidence": conf_f}
 
 
-class FatalApiError(Exception):
-    """credit 부족·인증 실패 등 재시도가 무의미한 영구 오류. 호출 측에서 잡아 전체 배치 abort."""
+def _is_fatal(message: str) -> bool:
+    low = message.lower()
+    return any(hint in low for hint in FATAL_HINTS)
 
 
-def classify_one(client: anthropic.Anthropic, model: str, title: str, summary: str) -> dict | None:
-    """1건 분류. 일시적 오류만 재시도. 영구 오류(400 BadRequest, 401 Auth)는 FatalApiError raise."""
+def classify_one(client: genai.Client, model: str, title: str, summary: str) -> dict | None:
+    """1건 분류. 일시 오류만 재시도. 영구 오류는 FatalApiError raise."""
     prompt = PROMPT_TEMPLATE.format(title=title[:300], summary=summary[:1000])
+    config = genai_types.GenerateContentConfig(
+        response_mime_type="application/json",
+        max_output_tokens=MAX_TOKENS,
+        temperature=0.2,
+    )
     last_exc: Exception | None = None
     for attempt in range(1, MAX_RETRIES + 1):
         try:
-            msg = client.messages.create(
+            resp = client.models.generate_content(
                 model=model,
-                max_tokens=MAX_TOKENS,
-                messages=[{"role": "user", "content": prompt}],
+                contents=prompt,
+                config=config,
             )
-            text = ""
-            for block in msg.content:
-                if getattr(block, "type", None) == "text":
-                    text += getattr(block, "text", "")
+            text = (resp.text or "").strip()
             parsed = parse_classification(text)
             if parsed is None:
                 print(f"[classifier] parse failed for title={title[:40]!r}: raw={text[:200]!r}", flush=True)
                 return None
             return parsed
-        except (anthropic.BadRequestError, anthropic.AuthenticationError, anthropic.PermissionDeniedError) as e:
-            # credit 부족 / invalid key / 권한 — retry 무의미. 호출 측이 전체 abort 결정.
-            raise FatalApiError(str(e)) from e
-        except anthropic.RateLimitError as e:
+        except genai_errors.ClientError as e:
+            # 4xx 계열. key/quota/permission 등 영구 오류 가능성.
+            msg = str(e)
+            if _is_fatal(msg):
+                raise FatalApiError(msg) from e
             last_exc = e
             wait = BACKOFF_BASE_SECONDS ** attempt
-            print(f"[classifier] rate limit, retry {attempt}/{MAX_RETRIES} in {wait:.0f}s", flush=True)
+            print(f"[classifier] client error ({msg[:200]}), retry {attempt}/{MAX_RETRIES} in {wait:.0f}s", flush=True)
             time.sleep(wait)
-        except anthropic.APIError as e:
+        except genai_errors.ServerError as e:
+            # 5xx 또는 일시 rate limit. 재시도 가치 있음.
             last_exc = e
             wait = BACKOFF_BASE_SECONDS ** attempt
-            print(f"[classifier] api error ({e!r}), retry {attempt}/{MAX_RETRIES} in {wait:.0f}s", flush=True)
+            print(f"[classifier] server error ({str(e)[:200]}), retry {attempt}/{MAX_RETRIES} in {wait:.0f}s", flush=True)
+            time.sleep(wait)
+        except Exception as e:
+            # 알 수 없는 오류. 메시지 검사 후 fatal/transient 분기.
+            msg = str(e)
+            if _is_fatal(msg):
+                raise FatalApiError(msg) from e
+            last_exc = e
+            wait = BACKOFF_BASE_SECONDS ** attempt
+            print(f"[classifier] unexpected error ({type(e).__name__}: {msg[:200]}), retry {attempt}/{MAX_RETRIES} in {wait:.0f}s", flush=True)
             time.sleep(wait)
     print(f"[classifier] failed after {MAX_RETRIES} retries: {last_exc!r}", flush=True)
     return None
@@ -186,7 +214,13 @@ def upsert_classification(supabase: Client, news_id: int, result: dict, model_id
         return False
 
 
-def run_once(supabase: Client, client: anthropic.Anthropic, model: str, batch: int) -> tuple[int, int]:
+def run_once(
+    supabase: Client,
+    client: genai.Client,
+    model: str,
+    batch: int,
+    call_sleep: float,
+) -> tuple[int, int]:
     """(시도 건수, 적재 성공 건수) 반환."""
     pending = fetch_pending_news(supabase, batch)
     if not pending:
@@ -195,7 +229,7 @@ def run_once(supabase: Client, client: anthropic.Anthropic, model: str, batch: i
     print(f"[classifier] pending={len(pending)}", flush=True)
 
     classified = 0
-    for row in pending:
+    for idx, row in enumerate(pending):
         if _shutdown:
             break
         title = row.get("title") or ""
@@ -203,7 +237,6 @@ def run_once(supabase: Client, client: anthropic.Anthropic, model: str, batch: i
         try:
             result = classify_one(client, model, title, summary)
         except FatalApiError as e:
-            # credit balance / invalid key — 더 시도해도 무의미. 배치 즉시 중단.
             print(f"[classifier] FATAL abort batch: {e}", flush=True)
             break
         if result is None:
@@ -216,6 +249,9 @@ def run_once(supabase: Client, client: anthropic.Anthropic, model: str, batch: i
                 f"category={result['event_category']} conf={result['confidence']}",
                 flush=True,
             )
+        # 다음 호출 전 sleep — Gemini Free tier RPM 보호. 마지막 항목 뒤엔 생략.
+        if idx + 1 < len(pending):
+            time.sleep(call_sleep)
     return (len(pending), classified)
 
 
@@ -224,29 +260,33 @@ def run() -> int:
 
     url = os.getenv("SUPABASE_URL")
     key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-    anth_key = os.getenv("ANTHROPIC_API_KEY")
+    google_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
     if not url or not key:
         print("[classifier] FATAL SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY missing", flush=True)
         return 1
-    if not anth_key:
-        print("[classifier] FATAL ANTHROPIC_API_KEY missing", flush=True)
+    if not google_key:
+        print("[classifier] FATAL GOOGLE_API_KEY missing", flush=True)
         return 1
 
     model = os.getenv("CLASSIFY_MODEL", DEFAULT_MODEL)
     batch = int(os.getenv("CLASSIFY_BATCH_SIZE", str(DEFAULT_BATCH)))
+    call_sleep = float(os.getenv("CLASSIFY_CALL_SLEEP_SECONDS", str(DEFAULT_CALL_SLEEP)))
     interval = int(os.getenv("POLL_INTERVAL_SECONDS", "3600"))
     once = os.getenv("POLL_ONCE", "").strip() == "1"
 
     supabase: Client = create_client(url, key)
-    client = anthropic.Anthropic(api_key=anth_key)
+    client = genai.Client(api_key=google_key)
 
     signal.signal(signal.SIGINT, _request_shutdown)
     signal.signal(signal.SIGTERM, _request_shutdown)
 
-    print(f"[classifier] start model={model} batch={batch} once={once}", flush=True)
+    print(
+        f"[classifier] start model={model} batch={batch} call_sleep={call_sleep}s once={once}",
+        flush=True,
+    )
 
     while True:
-        tried, ok = run_once(supabase, client, model, batch)
+        tried, ok = run_once(supabase, client, model, batch, call_sleep)
         print(f"[classifier] tick tried={tried} classified={ok}", flush=True)
 
         if once or _shutdown:
