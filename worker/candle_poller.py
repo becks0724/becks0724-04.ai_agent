@@ -3,10 +3,11 @@
 #
 # 환경변수
 #   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
-#   POLL_SYMBOLS      — "BTC,ETH,SOL" 형식. price_poller와 동일 매핑(coingecko_ids.py).
+#   POLL_SYMBOLS      — "BTC,ETH,SOL". 비어있으면 portfolio_holdings에서 동적 조회 (coins_catalog로 id 해소).
 #   POLL_ONCE         — "1"이면 1회 실행 후 종료 (GitHub Actions).
 #   POLL_INTERVAL_SECONDS — 무한 루프 시 간격 (기본 86400 = 24h).
 #   CANDLE_DAYS       — 1회 호출 시 가져올 일수 (기본 2 — 어제·오늘. UPSERT라 중복 안전).
+#   CANDLE_SYMBOL_SLEEP_SECONDS — 심볼간 sleep (기본 1.5초, CoinGecko rate limit 보호).
 #
 # 실행
 #   POLL_ONCE=1 python candle_poller.py
@@ -23,6 +24,7 @@ from dotenv import load_dotenv
 from supabase import Client, create_client
 
 from coingecko_ids import resolve_ids
+from symbol_resolver import fetch_active_symbols, resolve_via_catalog
 
 COINGECKO_BASE = "https://api.coingecko.com/api/v3"
 HTTP_TIMEOUT_SECONDS = 15.0
@@ -127,18 +129,35 @@ def run() -> int:
         print("[candles] FATAL SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY missing", flush=True)
         return 1
 
-    raw_symbols = os.getenv("POLL_SYMBOLS", "BTC,ETH,SOL")
-    symbols = [s for s in (raw_symbols.split(",") if raw_symbols else []) if s.strip()]
-    symbol_to_cg = resolve_ids(symbols)
-    if not symbol_to_cg:
-        print(f"[candles] FATAL no resolvable symbols from POLL_SYMBOLS={raw_symbols!r}", flush=True)
-        return 1
-
+    raw_symbols = os.getenv("POLL_SYMBOLS", "").strip()
     days = int(os.getenv("CANDLE_DAYS", "2"))
     interval = int(os.getenv("POLL_INTERVAL_SECONDS", str(24 * 3600)))
+    symbol_sleep = float(os.getenv("CANDLE_SYMBOL_SLEEP_SECONDS", "1.5"))
     once = os.getenv("POLL_ONCE", "").strip() == "1"
 
     supabase: Client = create_client(url, key)
+
+    if raw_symbols:
+        requested = [s.strip().upper() for s in raw_symbols.split(",") if s.strip()]
+        print(f"[candles] mode=env symbols={requested}", flush=True)
+    else:
+        requested = fetch_active_symbols(supabase)
+        print(f"[candles] mode=dynamic active_symbols={requested}", flush=True)
+
+    if not requested:
+        print("[candles] no symbols to poll, exit", flush=True)
+        return 0
+
+    symbol_to_cg = resolve_via_catalog(supabase, requested)
+    missing = sorted(set(requested) - set(symbol_to_cg.keys()))
+    if missing:
+        fallback = resolve_ids(missing)
+        if fallback:
+            print(f"[candles] static fallback resolved={list(fallback.keys())}", flush=True)
+            symbol_to_cg.update(fallback)
+    if not symbol_to_cg:
+        print(f"[candles] FATAL no resolvable symbols from requested={requested}", flush=True)
+        return 1
 
     signal.signal(signal.SIGINT, _request_shutdown)
     signal.signal(signal.SIGTERM, _request_shutdown)
@@ -151,14 +170,18 @@ def run() -> int:
 
     while True:
         total = 0
-        for symbol, cg_id in symbol_to_cg.items():
+        items = list(symbol_to_cg.items())
+        for idx, (symbol, cg_id) in enumerate(items):
             rows = fetch_market_chart(cg_id, days)
             if rows is None:
                 print(f"[candles] skip {symbol} (fetch failed)", flush=True)
-                continue
-            inserted = upsert_candles(supabase, symbol, rows)
-            total += inserted
-            print(f"[candles] {symbol}: upserted={inserted} rows", flush=True)
+            else:
+                inserted = upsert_candles(supabase, symbol, rows)
+                total += inserted
+                print(f"[candles] {symbol}: upserted={inserted} rows", flush=True)
+            # 다음 심볼 전 sleep (CoinGecko 무료 plan rate limit 보호). 마지막 심볼 뒤엔 생략.
+            if idx + 1 < len(items):
+                time.sleep(symbol_sleep)
         print(f"[candles] tick total_upserted={total}", flush=True)
 
         if once or _shutdown:

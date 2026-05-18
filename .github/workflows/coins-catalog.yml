@@ -1,0 +1,51 @@
+# CoinGecko /coins/markets 페이지를 받아 시총 5000위까지 coins_catalog에 적재한다.
+# 페이지간 1.5초 sleep으로 무료 plan rate limit 회피. 20페이지 × 1.5s = 30s + 네트워크.
+#
+# 주기: 매일 02:00 UTC. 다른 일 1회 워크플로(01:00/01:15/01:30)와 충돌 회피.
+
+name: coins catalog
+
+on:
+  schedule:
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      total:
+        description: '적재할 상위 코인 수 (기본 5000, 최대 ~10000)'
+        required: false
+        default: '5000'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: coins-catalog
+  cancel-in-progress: false
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: worker/requirements.txt
+
+      - name: Install deps
+        run: pip install -r worker/requirements.txt
+
+      - name: Run catalog poller (1회 적재)
+        working-directory: worker
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          POLL_ONCE: '1'
+          CATALOG_TOTAL: ${{ inputs.total || '5000' }}
+          WORKER_ENV: github-actions
+        run: python coins_catalog_poller.py

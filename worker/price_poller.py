@@ -4,8 +4,9 @@
 # 환경변수 (worker/.env)
 #   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY  — Supabase 클라이언트 (RLS 우회)
 #   POLL_INTERVAL_SECONDS                    — 폴링 간격 (기본 30초)
-#   POLL_SYMBOLS                             — "BTC,ETH,SOL" 형식
+#   POLL_SYMBOLS                             — "BTC,ETH,SOL". 비어있으면 portfolio_holdings에서 동적 조회.
 #   POLL_ONCE                                — "1"이면 1회만 실행 후 종료 (로컬 검증용)
+#   PRICE_CHUNK_SIZE                         — /simple/price 한 호출당 id 수 상한 (기본 250)
 #
 # 실행
 #   python price_poller.py            # 무한 루프
@@ -23,6 +24,7 @@ from dotenv import load_dotenv
 from supabase import Client, create_client
 
 from coingecko_ids import resolve_ids
+from symbol_resolver import fetch_active_symbols, resolve_via_catalog
 
 COINGECKO_BASE = "https://api.coingecko.com/api/v3"
 HTTP_TIMEOUT_SECONDS = 10.0
@@ -39,8 +41,8 @@ def _request_shutdown(signum: int, _frame) -> None:
     print(f"[poller] received signal {signum}, will exit after current loop", flush=True)
 
 
-def fetch_prices(coingecko_ids: list[str]) -> dict[str, float]:
-    """CoinGecko /simple/price 호출. id별 USD 가격을 dict로 반환."""
+def _fetch_prices_single(coingecko_ids: list[str]) -> dict[str, float]:
+    """CoinGecko /simple/price 한 번 호출. 한도(~250 id) 안에서만 사용한다."""
     if not coingecko_ids:
         return {}
     params = {
@@ -53,7 +55,6 @@ def fetch_prices(coingecko_ids: list[str]) -> dict[str, float]:
             with httpx.Client(timeout=HTTP_TIMEOUT_SECONDS) as client:
                 resp = client.get(f"{COINGECKO_BASE}/simple/price", params=params)
                 if resp.status_code == 429:
-                    # rate limit. 지수 백오프.
                     wait = BACKOFF_BASE_SECONDS ** attempt
                     print(f"[poller] 429 rate-limited, retry {attempt}/{MAX_RETRIES} in {wait:.0f}s", flush=True)
                     time.sleep(wait)
@@ -73,6 +74,19 @@ def fetch_prices(coingecko_ids: list[str]) -> dict[str, float]:
             time.sleep(wait)
     print(f"[poller] fetch failed after {MAX_RETRIES} retries: {last_exc!r}", flush=True)
     return {}
+
+
+def fetch_prices(coingecko_ids: list[str], chunk_size: int = 250) -> dict[str, float]:
+    """id 수가 많으면 chunk_size 단위로 분할 호출. chunk간 1초 sleep."""
+    if not coingecko_ids:
+        return {}
+    out: dict[str, float] = {}
+    for i in range(0, len(coingecko_ids), chunk_size):
+        chunk = coingecko_ids[i:i + chunk_size]
+        out.update(_fetch_prices_single(chunk))
+        if i + chunk_size < len(coingecko_ids):
+            time.sleep(1.0)
+    return out
 
 
 def insert_snapshots(
@@ -112,17 +126,36 @@ def run() -> int:
         print("[poller] FATAL SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY missing", flush=True)
         return 1
 
-    raw_symbols = os.getenv("POLL_SYMBOLS", "BTC,ETH,SOL")
-    symbols = [s for s in (raw_symbols.split(",") if raw_symbols else []) if s.strip()]
-    symbol_to_cg = resolve_ids(symbols)
-    if not symbol_to_cg:
-        print(f"[poller] FATAL no resolvable symbols from POLL_SYMBOLS={raw_symbols!r}", flush=True)
-        return 1
-
+    raw_symbols = os.getenv("POLL_SYMBOLS", "").strip()
     interval = int(os.getenv("POLL_INTERVAL_SECONDS", "30"))
+    chunk_size = int(os.getenv("PRICE_CHUNK_SIZE", "250"))
     once = os.getenv("POLL_ONCE", "").strip() == "1"
 
     supabase: Client = create_client(url, key)
+
+    # 심볼 결정: POLL_SYMBOLS env 우선 → 없으면 portfolio_holdings 동적 조회.
+    if raw_symbols:
+        requested = [s.strip().upper() for s in raw_symbols.split(",") if s.strip()]
+        print(f"[poller] mode=env symbols={requested}", flush=True)
+    else:
+        requested = fetch_active_symbols(supabase)
+        print(f"[poller] mode=dynamic active_symbols={requested}", flush=True)
+
+    if not requested:
+        print("[poller] no symbols to poll (POLL_SYMBOLS empty and portfolio_holdings empty), exit", flush=True)
+        return 0
+
+    # coins_catalog 우선 매핑(5000위까지 자동 지원) → 없으면 정적 매핑 fallback(15종 한정).
+    symbol_to_cg = resolve_via_catalog(supabase, requested)
+    missing = sorted(set(requested) - set(symbol_to_cg.keys()))
+    if missing:
+        fallback = resolve_ids(missing)
+        if fallback:
+            print(f"[poller] static fallback resolved={list(fallback.keys())}", flush=True)
+            symbol_to_cg.update(fallback)
+    if not symbol_to_cg:
+        print(f"[poller] FATAL no resolvable symbols from requested={requested}", flush=True)
+        return 1
 
     signal.signal(signal.SIGINT, _request_shutdown)
     signal.signal(signal.SIGTERM, _request_shutdown)
@@ -133,7 +166,7 @@ def run() -> int:
     )
 
     while True:
-        cg_to_price = fetch_prices(list(symbol_to_cg.values()))
+        cg_to_price = fetch_prices(list(symbol_to_cg.values()), chunk_size=chunk_size)
         inserted = insert_snapshots(supabase, symbol_to_cg, cg_to_price)
         print(f"[poller] tick inserted={inserted}/{len(symbol_to_cg)}", flush=True)
 
