@@ -14,6 +14,7 @@ import { normalizeError } from '../lib/errors'
 import { HoldingForm } from './HoldingForm'
 import { HoldingsList } from './HoldingsList'
 import { NewsFeed } from './NewsFeed'
+import { PeakSignals } from './PeakSignals'
 
 const PRICE_POLL_MS = 30_000
 
@@ -123,25 +124,27 @@ export function AppShell() {
   return (
     <div style={styles.wrapper}>
       <header style={styles.header}>
-        <div style={styles.brand}>crypto-monitoring</div>
-        {fearGreed && (
-          <div style={styles.fearGreed} title={`기준일 ${fearGreed.capturedAt.slice(0, 10)}`}>
-            <span style={styles.fgLabel}>공포·탐욕</span>
-            <span style={{ ...styles.fgValue, color: fgColor(fearGreed.classification) }}>
-              {fearGreed.value}
-            </span>
-            <span style={styles.fgClass}>({fearGreed.classification})</span>
+        <div style={styles.headerInner}>
+          <div style={styles.brand}>crypto-monitoring</div>
+          <div style={styles.right}>
+            {fearGreed && (
+              <div style={styles.fearGreed} title={`기준일 ${fearGreed.capturedAt.slice(0, 10)}`}>
+                <span style={styles.fgLabel}>Fear &amp; Greed</span>
+                <span style={{ ...styles.fgValue, color: fgColor(fearGreed.classification) }}>
+                  {fearGreed.value}
+                </span>
+                <span style={styles.fgClass}>· {fearGreed.classification}</span>
+              </div>
+            )}
+            <span style={styles.email}>{email}</span>
+            <button
+              type="button"
+              style={styles.logout}
+              onClick={() => signOut()}
+            >
+              로그아웃
+            </button>
           </div>
-        )}
-        <div style={styles.right}>
-          <span style={styles.email}>{email}</span>
-          <button
-            type="button"
-            style={styles.logout}
-            onClick={() => signOut()}
-          >
-            로그아웃
-          </button>
         </div>
       </header>
       <main style={styles.main}>
@@ -167,6 +170,8 @@ export function AppShell() {
             onChanged={setHoldings}
           />
         )}
+
+        <PeakSignals />
 
         <NewsFeed symbols={holdings.map((h) => h.symbol)} />
       </main>
@@ -226,7 +231,7 @@ function SummaryBox({
   const fmtKrw = (n: number) =>
     fx ? `₩${new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 0 }).format(n * fx.rate)}` : '—'
   const pnlColor =
-    totals.totalPnlUsd > 0 ? '#34d399' : totals.totalPnlUsd < 0 ? '#fca5a5' : '#9aa3ad'
+    totals.totalPnlUsd > 0 ? '#05b169' : totals.totalPnlUsd < 0 ? '#cf202f' : '#5b616e'
   const ago = pricesAt ? Math.max(0, Math.floor((Date.now() - pricesAt) / 1000)) : null
   return (
     <div style={summaryStyles.box}>
@@ -267,85 +272,132 @@ function SummaryBox({
 
 function fgColor(classification: string): string {
   switch (classification) {
-    case 'Extreme Fear': return '#fca5a5'
-    case 'Fear':         return '#fb923c'
-    case 'Neutral':      return '#facc15'
-    case 'Greed':        return '#86efac'
-    case 'Extreme Greed':return '#34d399'
-    default:             return '#9aa3ad'
+    case 'Extreme Fear': return '#cf202f'
+    case 'Fear':         return '#cf202f'
+    case 'Neutral':      return '#5b616e'
+    case 'Greed':        return '#05b169'
+    case 'Extreme Greed':return '#05b169'
+    default:             return '#5b616e'
   }
 }
 
+const numberFont = "'JetBrains Mono', ui-monospace, 'SF Mono', Consolas, monospace"
+
 const styles: Record<string, React.CSSProperties> = {
-  wrapper: { minHeight: '100vh', background: '#0b0d10', color: '#e6e8eb' },
+  wrapper: { minHeight: '100vh', background: '#ffffff', color: '#0a0b0d' },
   header: {
+    background: '#ffffff',
+    borderBottom: '1px solid #dee1e6',
+    position: 'sticky',
+    top: 0,
+    zIndex: 10,
+  },
+  headerInner: {
+    maxWidth: '1200px',
+    margin: '0 auto',
+    height: '64px',
+    padding: '0 24px',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: '14px 20px',
-    borderBottom: '1px solid #1c1f24',
   },
-  brand: { fontWeight: 700 },
+  brand: {
+    fontWeight: 600,
+    fontSize: '18px',
+    color: '#0052ff',
+    letterSpacing: '-0.2px',
+  },
   fearGreed: {
-    display: 'flex',
+    display: 'inline-flex',
     alignItems: 'baseline',
     gap: '6px',
-    padding: '4px 10px',
-    background: '#11141a',
-    border: '1px solid #1c1f24',
-    borderRadius: '6px',
+    padding: '6px 14px',
+    background: '#eef0f3',
+    borderRadius: '100px',
+    fontSize: '13px',
   },
-  fgLabel: { fontSize: '12px', color: '#9aa3ad' },
-  fgValue: { fontSize: '16px', fontWeight: 700 },
-  fgClass: { fontSize: '12px', color: '#9aa3ad' },
-  right: { display: 'flex', alignItems: 'center', gap: '12px' },
-  email: { color: '#9aa3ad', fontSize: '13px' },
+  fgLabel: { fontSize: '12px', color: '#5b616e', fontWeight: 500 },
+  fgValue: { fontSize: '14px', fontWeight: 600, fontFamily: numberFont },
+  fgClass: { fontSize: '12px', color: '#5b616e' },
+  right: { display: 'flex', alignItems: 'center', gap: '14px' },
+  email: { color: '#5b616e', fontSize: '13px' },
   logout: {
-    padding: '6px 10px',
-    background: 'transparent',
-    border: '1px solid #2a2f36',
-    borderRadius: '6px',
-    color: '#e6e8eb',
+    padding: '8px 16px',
+    background: '#eef0f3',
+    border: 'none',
+    borderRadius: '100px',
+    color: '#0a0b0d',
     cursor: 'pointer',
-    fontSize: '13px',
+    fontSize: '14px',
+    fontWeight: 600,
+    height: '36px',
   },
-  main: { padding: '24px 20px', maxWidth: '1100px', margin: '0 auto' },
-  sectionTitle: { margin: '4px 0 14px', fontSize: '16px', fontWeight: 600 },
-  muted: { color: '#9aa3ad', fontSize: '14px' },
+  main: { padding: '40px 24px 96px', maxWidth: '1200px', margin: '0 auto' },
+  sectionTitle: {
+    margin: '0 0 24px',
+    fontSize: '32px',
+    fontWeight: 400,
+    letterSpacing: '-0.4px',
+    color: '#0a0b0d',
+    lineHeight: 1.13,
+  },
+  muted: { color: '#5b616e', fontSize: '14px' },
   error: {
-    padding: '8px 10px',
-    background: '#2a1212',
-    border: '1px solid #6b1f1f',
-    borderRadius: '6px',
-    color: '#fca5a5',
-    fontSize: '13px',
+    padding: '14px 16px',
+    background: '#fef2f2',
+    border: '1px solid #fecaca',
+    borderRadius: '12px',
+    color: '#cf202f',
+    fontSize: '14px',
   },
 }
 
 const summaryStyles: Record<string, React.CSSProperties> = {
   box: {
     display: 'grid',
-    gridTemplateColumns: '1fr 1fr 1fr 1fr',
-    gap: '12px',
-    padding: '14px',
-    background: '#15181c',
-    border: '1px solid #1c1f24',
-    borderRadius: '10px',
-    marginBottom: '16px',
+    gridTemplateColumns: '1fr 1fr 1fr 1.2fr',
+    gap: '0',
+    padding: '32px',
+    background: '#ffffff',
+    border: '1px solid #dee1e6',
+    borderRadius: '24px',
+    marginBottom: '24px',
   },
-  col: { display: 'flex', flexDirection: 'column', gap: '4px' },
-  colMeta: { display: 'flex', flexDirection: 'column', gap: '4px', justifyContent: 'center' },
-  label: { fontSize: '12px', color: '#9aa3ad' },
-  value: { fontSize: '18px', fontWeight: 700 },
-  pct: { fontSize: '14px', fontWeight: 600, marginLeft: '4px' },
-  sub: { fontSize: '12px', color: '#9aa3ad' },
-  metaLine: { fontSize: '12px', color: '#9aa3ad' },
+  col: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+    paddingRight: '24px',
+    borderRight: '1px solid #eef0f3',
+  },
+  colMeta: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+    justifyContent: 'center',
+    paddingLeft: '24px',
+  },
+  label: {
+    fontSize: '13px',
+    color: '#5b616e',
+    fontWeight: 500,
+  },
+  value: {
+    fontSize: '24px',
+    fontWeight: 500,
+    fontFamily: numberFont,
+    color: '#0a0b0d',
+    letterSpacing: '-0.3px',
+  },
+  pct: { fontSize: '14px', fontWeight: 500, marginLeft: '6px', fontFamily: numberFont },
+  sub: { fontSize: '13px', color: '#5b616e', fontFamily: numberFont },
+  metaLine: { fontSize: '13px', color: '#5b616e' },
   warn: {
     fontSize: '12px',
-    color: '#facc15',
-    padding: '4px 8px',
-    background: '#2a2110',
-    border: '1px solid #6b5a1f',
-    borderRadius: '4px',
+    color: '#0a0b0d',
+    padding: '8px 12px',
+    background: '#fff8e6',
+    border: '1px solid #f4b000',
+    borderRadius: '8px',
   },
 }

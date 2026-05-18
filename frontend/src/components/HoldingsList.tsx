@@ -23,7 +23,11 @@ export function HoldingsList({ holdings, prices, fx, onChanged }: Props) {
   const [chartSymbol, setChartSymbol] = useState<string | null>(null)
 
   if (holdings.length === 0) {
-    return <p style={styles.empty}>등록된 보유 자산이 없다. 위 폼에서 추가해라.</p>
+    return (
+      <div style={styles.emptyCard}>
+        <p style={styles.empty}>등록된 보유 자산이 없다. 위 폼에서 추가해라.</p>
+      </div>
+    )
   }
 
   const startEdit = (h: Holding) => {
@@ -68,8 +72,9 @@ export function HoldingsList({ holdings, prices, fx, onChanged }: Props) {
   }
 
   return (
-    <div>
+    <div style={styles.card}>
       {error && <p style={styles.error}>{error}</p>}
+      <div style={styles.cardHeader}>보유 자산</div>
       <table style={styles.table}>
         <thead>
           <tr>
@@ -79,7 +84,7 @@ export function HoldingsList({ holdings, prices, fx, onChanged }: Props) {
             <th style={styles.thRight}>현재가 (USD)</th>
             <th style={styles.thRight}>평가금액</th>
             <th style={styles.thRight}>손익</th>
-            <th style={styles.thRight}>액션</th>
+            <th style={styles.thActions}>액션</th>
           </tr>
         </thead>
         <tbody>
@@ -92,10 +97,17 @@ export function HoldingsList({ holdings, prices, fx, onChanged }: Props) {
             const pnl = value !== null ? value - cost : null
             const pnlPct = pnl !== null && cost > 0 ? (pnl / cost) * 100 : null
             const pnlColor =
-              pnl === null ? '#9aa3ad' : pnl > 0 ? '#34d399' : pnl < 0 ? '#fca5a5' : '#9aa3ad'
+              pnl === null ? '#5b616e' : pnl > 0 ? '#05b169' : pnl < 0 ? '#cf202f' : '#5b616e'
             return (
               <tr key={h.id} style={styles.tr}>
-                <td style={styles.tdSymbol}>{h.symbol}</td>
+                <td style={styles.tdSymbol}>
+                  <div style={styles.symbolWrap}>
+                    <div style={styles.assetIcon}>{h.symbol.charAt(0)}</div>
+                    <div>
+                      <div style={styles.symbolTicker}>{h.symbol}</div>
+                    </div>
+                  </div>
+                </td>
                 <td style={styles.tdRight}>
                   {editing ? (
                     <input
@@ -130,7 +142,7 @@ export function HoldingsList({ holdings, prices, fx, onChanged }: Props) {
                 <td style={styles.tdRight}>
                   {value !== null ? (
                     <>
-                      <div>{formatUsd(value)}</div>
+                      <div style={styles.priceMain}>{formatUsd(value)}</div>
                       <div style={styles.subKrw}>{formatKrw(value, fx)}</div>
                     </>
                   ) : (
@@ -140,13 +152,15 @@ export function HoldingsList({ holdings, prices, fx, onChanged }: Props) {
                 <td style={{ ...styles.tdRight, color: pnlColor }}>
                   {pnl !== null ? (
                     <>
-                      <div>
+                      <div style={styles.priceMain}>
                         {formatUsd(pnl)}
                         {pnlPct !== null && (
                           <span style={styles.pct}> ({pnlPct.toFixed(2)}%)</span>
                         )}
                       </div>
-                      <div style={styles.subKrw}>{formatKrw(pnl, fx)}</div>
+                      <div style={{ ...styles.subKrw, color: pnlColor, opacity: 0.7 }}>
+                        {formatKrw(pnl, fx)}
+                      </div>
                     </>
                   ) : (
                     '—'
@@ -228,98 +242,172 @@ function formatKrw(usd: number, fx: UsdKrwRate | null): string {
   return `₩${new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 0 }).format(usd * fx.rate)}`
 }
 
+const numberFont = "'JetBrains Mono', ui-monospace, 'SF Mono', Consolas, monospace"
+
 const styles: Record<string, React.CSSProperties> = {
-  empty: { color: '#9aa3ad', fontSize: '14px' },
+  card: {
+    background: '#ffffff',
+    border: '1px solid #dee1e6',
+    borderRadius: '24px',
+    padding: '24px 32px 32px',
+    marginBottom: '24px',
+    overflow: 'hidden',
+  },
+  cardHeader: {
+    fontSize: '18px',
+    fontWeight: 600,
+    color: '#0a0b0d',
+    marginBottom: '16px',
+  },
+  emptyCard: {
+    background: '#ffffff',
+    border: '1px solid #dee1e6',
+    borderRadius: '24px',
+    padding: '40px 32px',
+    marginBottom: '24px',
+    textAlign: 'center',
+  },
+  empty: { color: '#5b616e', fontSize: '15px' },
   table: {
     width: '100%',
     borderCollapse: 'collapse',
-    background: '#15181c',
-    border: '1px solid #1c1f24',
-    borderRadius: '10px',
-    overflow: 'hidden',
   },
   th: {
     textAlign: 'left',
-    padding: '10px 14px',
+    padding: '12px 16px 12px 0',
     fontSize: '12px',
-    color: '#9aa3ad',
+    color: '#5b616e',
     fontWeight: 600,
-    background: '#11141a',
-    borderBottom: '1px solid #1c1f24',
+    borderBottom: '1px solid #dee1e6',
+    textTransform: 'uppercase',
+    letterSpacing: '0.4px',
   },
   thRight: {
     textAlign: 'right',
-    padding: '10px 14px',
+    padding: '12px 16px',
     fontSize: '12px',
-    color: '#9aa3ad',
+    color: '#5b616e',
     fontWeight: 600,
-    background: '#11141a',
-    borderBottom: '1px solid #1c1f24',
+    borderBottom: '1px solid #dee1e6',
+    textTransform: 'uppercase',
+    letterSpacing: '0.4px',
   },
-  tr: { borderBottom: '1px solid #1c1f24' },
-  tdSymbol: { padding: '10px 14px', fontSize: '14px', fontWeight: 700, color: '#e6e8eb' },
-  tdRight: {
-    padding: '10px 14px',
-    fontSize: '14px',
-    color: '#e6e8eb',
+  thActions: {
     textAlign: 'right',
+    padding: '12px 0 12px 16px',
+    fontSize: '12px',
+    color: '#5b616e',
+    fontWeight: 600,
+    borderBottom: '1px solid #dee1e6',
+    textTransform: 'uppercase',
+    letterSpacing: '0.4px',
+  },
+  tr: { borderBottom: '1px solid #eef0f3' },
+  tdSymbol: {
+    padding: '16px 16px 16px 0',
+    fontSize: '15px',
+    fontWeight: 600,
+    color: '#0a0b0d',
     verticalAlign: 'top',
   },
-  subKrw: { fontSize: '11px', color: '#9aa3ad', marginTop: '2px' },
-  pct: { fontSize: '12px', marginLeft: '4px' },
+  symbolWrap: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+  },
+  assetIcon: {
+    width: '32px',
+    height: '32px',
+    borderRadius: '9999px',
+    background: '#eef0f3',
+    color: '#0a0b0d',
+    fontSize: '13px',
+    fontWeight: 700,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  symbolTicker: {
+    fontSize: '16px',
+    fontWeight: 600,
+    color: '#0a0b0d',
+  },
+  tdRight: {
+    padding: '16px',
+    fontSize: '15px',
+    color: '#0a0b0d',
+    textAlign: 'right',
+    verticalAlign: 'top',
+    fontFamily: numberFont,
+    fontWeight: 500,
+  },
+  priceMain: { fontSize: '15px', fontWeight: 500 },
+  subKrw: {
+    fontSize: '12px',
+    color: '#5b616e',
+    marginTop: '4px',
+    fontFamily: numberFont,
+  },
+  pct: { fontSize: '13px', marginLeft: '4px' },
   tdActions: {
-    padding: '10px 14px',
+    padding: '16px 0 16px 16px',
     textAlign: 'right',
     whiteSpace: 'nowrap',
   },
   cellInput: {
-    width: '110px',
-    padding: '4px 8px',
-    background: '#0b0d10',
-    border: '1px solid #2a2f36',
-    borderRadius: '4px',
-    color: '#e6e8eb',
-    fontSize: '13px',
-    outline: 'none',
+    width: '120px',
+    padding: '8px 10px',
+    background: '#ffffff',
+    border: '1px solid #dee1e6',
+    borderRadius: '8px',
+    color: '#0a0b0d',
+    fontSize: '14px',
     textAlign: 'right',
+    fontFamily: numberFont,
   },
   actionPrimary: {
-    padding: '4px 10px',
-    background: '#3b82f6',
+    padding: '6px 14px',
+    background: '#0052ff',
     border: 'none',
-    borderRadius: '4px',
-    color: '#fff',
-    fontSize: '12px',
+    borderRadius: '100px',
+    color: '#ffffff',
+    fontSize: '13px',
+    fontWeight: 600,
     cursor: 'pointer',
-    marginLeft: '4px',
+    marginLeft: '6px',
+    height: '32px',
   },
   actionGhost: {
-    padding: '4px 10px',
-    background: 'transparent',
-    border: '1px solid #2a2f36',
-    borderRadius: '4px',
-    color: '#e6e8eb',
-    fontSize: '12px',
+    padding: '6px 14px',
+    background: '#eef0f3',
+    border: 'none',
+    borderRadius: '100px',
+    color: '#0a0b0d',
+    fontSize: '13px',
+    fontWeight: 600,
     cursor: 'pointer',
-    marginLeft: '4px',
+    marginLeft: '6px',
+    height: '32px',
   },
   actionDanger: {
-    padding: '4px 10px',
+    padding: '6px 14px',
     background: 'transparent',
-    border: '1px solid #6b1f1f',
-    borderRadius: '4px',
-    color: '#fca5a5',
-    fontSize: '12px',
+    border: '1px solid #cf202f',
+    borderRadius: '100px',
+    color: '#cf202f',
+    fontSize: '13px',
+    fontWeight: 600,
     cursor: 'pointer',
-    marginLeft: '4px',
+    marginLeft: '6px',
+    height: '32px',
   },
   error: {
-    marginBottom: '10px',
-    padding: '8px 10px',
-    background: '#2a1212',
-    border: '1px solid #6b1f1f',
-    borderRadius: '6px',
-    color: '#fca5a5',
-    fontSize: '13px',
+    marginBottom: '14px',
+    padding: '12px 14px',
+    background: '#fef2f2',
+    border: '1px solid #fecaca',
+    borderRadius: '12px',
+    color: '#cf202f',
+    fontSize: '14px',
   },
 }

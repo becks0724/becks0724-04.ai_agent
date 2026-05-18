@@ -122,6 +122,7 @@ export function HoldingForm({ fx, fxLoading, fxError, onReloadFx, onCreated }: P
 
   return (
     <form onSubmit={submit} style={styles.form}>
+      <div style={styles.title}>새 보유 자산 등록</div>
       <div style={styles.row}>
         <label style={styles.label}>
           심볼
@@ -188,7 +189,11 @@ export function HoldingForm({ fx, fxLoading, fxError, onReloadFx, onCreated }: P
             required
           />
         </label>
-        <button type="submit" style={styles.button} disabled={submitting}>
+        <button
+          type="submit"
+          style={{ ...styles.button, ...(submitting ? styles.buttonDisabled : {}) }}
+          disabled={submitting}
+        >
           {submitting ? '등록 중…' : '추가'}
         </button>
       </div>
@@ -214,71 +219,88 @@ export function HoldingForm({ fx, fxLoading, fxError, onReloadFx, onCreated }: P
   )
 }
 
+const numberFont = "'JetBrains Mono', ui-monospace, 'SF Mono', Consolas, monospace"
+
 const styles: Record<string, React.CSSProperties> = {
   form: {
-    background: '#15181c',
-    border: '1px solid #1c1f24',
-    borderRadius: '10px',
-    padding: '14px',
+    background: '#ffffff',
+    border: '1px solid #dee1e6',
+    borderRadius: '24px',
+    padding: '32px',
+    marginBottom: '24px',
+  },
+  title: {
+    fontSize: '18px',
+    fontWeight: 600,
+    color: '#0a0b0d',
     marginBottom: '20px',
   },
   row: {
     display: 'grid',
-    gridTemplateColumns: '110px 110px 1fr 1fr auto',
-    gap: '12px',
+    gridTemplateColumns: '1.2fr 1fr 1.2fr 1.2fr auto',
+    gap: '16px',
     alignItems: 'end',
   },
   label: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '6px',
-    fontSize: '12px',
-    color: '#9aa3ad',
+    gap: '8px',
+    fontSize: '13px',
+    color: '#5b616e',
+    fontWeight: 500,
   },
   input: {
-    padding: '8px 10px',
-    background: '#0b0d10',
-    border: '1px solid #2a2f36',
-    borderRadius: '6px',
-    color: '#e6e8eb',
-    fontSize: '14px',
-    outline: 'none',
+    padding: '12px 14px',
+    background: '#ffffff',
+    border: '1px solid #dee1e6',
+    borderRadius: '12px',
+    color: '#0a0b0d',
+    fontSize: '15px',
+    height: '44px',
+    fontFamily: numberFont,
   },
   button: {
-    padding: '8px 14px',
-    background: '#3b82f6',
+    padding: '12px 24px',
+    background: '#0052ff',
     border: 'none',
-    borderRadius: '6px',
-    color: '#fff',
+    borderRadius: '100px',
+    color: '#ffffff',
     fontWeight: 600,
+    fontSize: '15px',
     cursor: 'pointer',
-    height: '34px',
+    height: '44px',
+    whiteSpace: 'nowrap',
+  },
+  buttonDisabled: {
+    background: '#a8b8cc',
+    cursor: 'not-allowed',
   },
   fxLine: {
-    marginTop: '10px',
+    marginTop: '16px',
     display: 'flex',
     alignItems: 'center',
-    gap: '10px',
-    fontSize: '12px',
+    gap: '12px',
+    fontSize: '13px',
   },
-  muted: { color: '#9aa3ad' },
+  muted: { color: '#5b616e' },
   fxRefresh: {
-    padding: '2px 8px',
-    background: 'transparent',
-    border: '1px solid #2a2f36',
-    borderRadius: '4px',
-    color: '#9aa3ad',
-    fontSize: '11px',
+    padding: '4px 12px',
+    background: '#eef0f3',
+    border: 'none',
+    borderRadius: '100px',
+    color: '#0a0b0d',
+    fontSize: '12px',
+    fontWeight: 600,
     cursor: 'pointer',
   },
-  fxError: { color: '#fca5a5' },
+  fxError: { color: '#cf202f' },
   error: {
-    marginTop: '10px',
-    padding: '8px 10px',
-    background: '#2a1212',
-    border: '1px solid #6b1f1f',
-    borderRadius: '6px',
-    color: '#fca5a5',
-    fontSize: '13px',
+    marginTop: '14px',
+    padding: '12px 14px',
+    background: '#fef2f2',
+    border: '1px solid #fecaca',
+    borderRadius: '12px',
+    color: '#cf202f',
+    fontSize: '14px',
   },
 }

@@ -18,7 +18,7 @@ function App() {
     // 세션 복구에 실패했고 로그인도 안 된 상태. 디버깅 메시지 노출 후 로그인 화면 안내.
     return (
       <div style={loadingStyle}>
-        <p style={{ color: '#fca5a5' }}>세션 로딩 오류: {error}</p>
+        <p style={{ color: '#cf202f' }}>세션 로딩 오류: {error}</p>
         <Login />
       </div>
     )
@@ -33,8 +33,8 @@ const loadingStyle: React.CSSProperties = {
   flexDirection: 'column',
   alignItems: 'center',
   justifyContent: 'center',
-  background: '#0b0d10',
-  color: '#9aa3ad',
+  background: '#ffffff',
+  color: '#5b616e',
   gap: '12px',
 }
 
