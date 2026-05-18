@@ -13,6 +13,7 @@ import type { FearGreed } from '../lib/fearGreed'
 import { normalizeError } from '../lib/errors'
 import { HoldingForm } from './HoldingForm'
 import { HoldingsList } from './HoldingsList'
+import { NewsFeed } from './NewsFeed'
 
 const PRICE_POLL_MS = 30_000
 
@@ -166,6 +167,8 @@ export function AppShell() {
             onChanged={setHoldings}
           />
         )}
+
+        <NewsFeed symbols={holdings.map((h) => h.symbol)} />
       </main>
     </div>
   )
