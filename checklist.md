@@ -244,15 +244,26 @@
 
 ---
 
-## Stage 4 · LLM 기반 뉴스 감성·이벤트 분류
+## Stage 4 · LLM 기반 뉴스 감성·이벤트 분류 ★ 진행 중 (코드 완료, cron 자동 백필)
 
-- [ ] LLM 호출 래퍼 (worker, 키는 환경변수)
-- [ ] 프롬프트 설계 — 감성(긍정/중립/부정), 이벤트 카테고리(상장·규제·해킹 등)
-- [ ] 분류 결과 저장 컬럼 추가
-- [ ] 일괄 분류 백필 잡
-- [ ] 분류 결과 캐시 (동일 뉴스 재호출 방지)
-- [ ] 프론트 — 감성 배지·이벤트 태그 표시
-- [ ] **명시: 가격 예측 기능은 만들지 않는다. 감성·통계 표시까지만.**
+> 설계 결정 (2026-05-18)
+> - **공급자** — Anthropic 결제 등록 부담으로 Google Gemini 무료 tier 채택. 모델 `gemini-2.5-flash-lite`.
+> - **thinking_budget=0** — 2.5 시리즈는 thinking 모델이라 max_output_tokens가 내부 추론에 소진. 비활성화로 응답 텍스트 확보.
+> - **RPD 20 한도** — 무료 tier 일별 한도 20건 확인. 매시간 cron이 일 ~20건 점진 처리(약 4일에 102건 백필 완료).
+> - **fatal vs transient** — PerDay quota·인증·권한·지원 안 됨 지역만 영구 abort. PerMinute quota는 응답의 retryDelay 추출해 정확히 대기.
+> - **감성 3-class + event 6-class** — positive/neutral/negative × listing/regulation/hack/partnership/tech/general.
+> - **가격 예측 금지 명시** — 프롬프트와 UI 면책에 통계 표시 전용 명시.
+
+- [x] LLM 호출 래퍼 — `worker/news_classifier.py` (google-genai SDK, response_mime_type=json, temperature 0.2, thinking_budget=0)
+- [x] 프롬프트 설계 — 한국어 가이드 포함, 매매 신호 해석 금지 명시
+- [x] 데이터 모델 — `worker/migrations/0007_news_classifications.sql` (news_id PK FK, CHECK 제약, 인덱스 2종, RLS 2정책)
+- [x] 차집합 미분류 조회 — fetch_pending_news (news_classifications에 없는 news 최신순)
+- [x] rate limit·영구 오류 분리 — _is_fatal/_extract_retry_delay
+- [x] GitHub Actions — `.github/workflows/news-classify.yml` (cron `15 * * * *` + batch input)
+- [x] 프론트 배지·태그 — `lib/news.ts` 임베딩 + `NewsFeed.tsx` sentiment 색상 배지 + category 한국어 태그
+- [x] **검증 (2026-05-18)** — 약 34건 적재 (positive/neutral/negative + tech/regulation/general/hack/partnership/listing 모두 등장). Gemini RPD 20 한도 안에서 cron 자동 백필.
+- [ ] 102건 전체 완료 대기 — cron 매시간 :15 UTC 약 4일 소요
+- [ ] prod URL 시각 검증 — NewsFeed 배지/태그 표시
 
 ---
 

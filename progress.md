@@ -4,8 +4,8 @@
 
 ---
 
-## 현재 상태 (2026-05-18 KST 추가, 본 세션 누적 commit 9건)
-**Stage 3 적재 검증 완료 + coins_catalog 5000위 도입 + 워커 동적 모드 + ChartModal 렌더링 fix.** 본 세션 핵심 — (1) Stage 3 news-poll 워크플로 검증 통과 (102 entries, 69 ticker_links), (2) coins_catalog 테이블 + 폴러 + 시총 5000개 적재 (pass1/2 구조로 rate limit 대응), (3) price/candle/indicators 폴러가 POLL_SYMBOLS 비어있으면 portfolio_holdings 기반 동적 모드, (4) HoldingForm 심볼 자동완성 datalist, (5) FET 4번째 심볼로 추가하고 4 워크플로 모두 동적 매핑 검증, (6) ChartModal line 시리즈가 BusinessDay key 중복으로 안 그려지던 문제를 UTCTimestamp+dedup으로 해결 + 작은 MACD 값 표시 정밀도 가변. 다음 분기점: Stage 4(LLM 감성, key 필요) 또는 Stage 2.5(강세장 정점, CMC key 필요).
+## 현재 상태 (2026-05-18 KST 추가, 본 세션 누적 commit 16건)
+**Stage 3 검증 + catalog 5000위 + 워커 동적 모드 + ChartModal fix + Stage 4 코드 완료 + Gemini 무료 분류 약 34건 적재.** 본 세션 핵심 — (1) Stage 3 news-poll 검증(102 entries, 69 ticker_links), (2) coins_catalog 5000위 (pass1/2 rate limit 대응), (3) price/candle/indicators 동적 심볼 모드, (4) HoldingForm 자동완성, (5) FET 4-symbol 4 워크플로 검증, (6) ChartModal UTCTimestamp+dedup, (7) **Stage 4 LLM 분류 — Anthropic→Gemini 전환(무료 요구), gemini-2.5-flash-lite + thinking_budget=0, 분당 quota는 retryDelay 사용 + 일별 quota만 fatal, NewsFeed UI 배지/태그 통합**. **Gemini 무료 RPD가 모델 무관 20건뿐**으로 확인 — 분류는 cron 매시간 :15 UTC가 점진 처리(약 4일 후 102건 완료). 다음 분기점: Stage 2.5(강세장 정점, CMC key 필요).
 
 | 영역 | 상태 | 비고 |
 |---|---|---|
@@ -20,6 +20,8 @@
 | coins_catalog 5000위 | ✓ | 0006 SQL + coins_catalog_poller (per_page 250 × 20 + pass1/2 rate limit 대응). 적재 5000/5000. price/candle/indicators가 catalog 우선 매핑 → 정적 fallback(15종) |
 | HoldingForm 자동완성 | ✓ | datalist + 200ms 디바운스 검색 (symbol/name ilike, rank 정렬 상위 30) |
 | FET 검증 사례 | ✓ | 사용자가 FET 보유 추가 → price 4건/candle 91×4=364행/indicators 374행(RSI 42.575/MACD -0.0048). 동적 매핑 모든 단계 통과 |
+| Stage 4 LLM 분류 (코드) | ✓ | 0007 SQL + news_classifier(Gemini 2.5 Flash-Lite, thinking_budget=0, response_mime_type=json) + news-classify.yml(매시간 :15 UTC) + NewsFeed 배지(positive/neutral/negative)·태그(상장/규제/해킹/파트너십/기술/일반) |
+| Stage 4 LLM 분류 (적재) | 진행 중 | 본 세션 약 34건 적재(다양한 sentiment·category 분포 확인). Gemini 무료 RPD 20건 한도로 cron이 매일 ~20건씩 약 4일에 걸쳐 102건 완료 예정 |
 
 ---
 
@@ -116,23 +118,22 @@ session prop이 `App → AppShell`로, userId prop이 `AppShell → HoldingForm`
 
 ## 다음 할 일 (다음 세션 시작 시)
 
-### 본 작업 — Stage 4 (LLM 감성 분석) 또는 Stage 2.5 (강세장 정점 신호)
-Stage 3 적재 + catalog 5000위 + FET 검증 완료 상태. 추천 흐름은 **Stage 4** (이미 news 테이블에 102건이 적재돼 있어 LLM 분류 백필이 자연스러움).
+### Stage 4 분류 자동 진행
+- 본 세션 마감 시점에 약 34/102건 분류 적재. **다음 trigger 불필요** — `news-classify.yml` cron 매시간 :15 UTC가 일별 RPD 20건 한도 안에서 점진 처리 (약 4일 후 완료).
+- prod URL 시각 검증: NewsFeed 항목에 sentiment 배지(긍정 녹/중립 노/부정 빨) + category 태그(상장/규제/해킹/파트너십/기술/일반) 표시. 분류 안 된 신규 뉴스는 배지 없이 표시.
+- 검증 쿼리(SQL Editor):
+  ```sql
+  select sentiment, count(*) from news_classifications group by sentiment order by 2 desc;
+  select event_category, count(*) from news_classifications group by event_category order by 2 desc;
+  ```
 
-**Stage 4 진입 시 첫 작업**
-- 사용자 액션 — Anthropic API key 발급 (Claude Haiku 4.5 추천: 비용 최저, 분류 충분)
-- 데이터 모델: `worker/migrations/0007_news_classifications.sql` — sentiment(긍정/중립/부정), event_category(상장/규제/해킹/파트너십/일반), confidence, model_id, classified_at
-- 워커: `worker/news_classifier.py` — 미분류 news 배치 처리, 프롬프트 구조 (제목+본문 50자 → JSON 응답)
-- 백필 잡 + 신규 뉴스 trigger
-- 프론트: NewsFeed 항목에 감성 배지 + 이벤트 태그
-
-**Stage 2.5 진입 시 사전 액션**
-- 사용자 — CMC Pro Basic API key 발급 (무료, 10k credits/월)
+### 본 작업 — Stage 2.5 (강세장 정점 신호)
+- 사용자 액션 — CMC Pro Basic API key 발급 (무료, 10k credits/월)
 - 그 후: peak_signals 테이블, CMC Altcoin Season Index 어댑터, CoinGecko 자체 계산 18-23개
 
 ### 단기 잔여
-- prod URL 시각 검증 — ChartModal FET line 표시 (`5383e69` 배포 후 확인)
-- cron schedule 발화 모니터링 — 본 세션 5/17 04-05 UTC 1건씩 관측 후 추가 누적
+- prod URL 시각 검증 — ChartModal FET line(`5383e69`) + NewsFeed 배지/태그 표시
+- cron schedule 발화 모니터링
 - 빈 `becks0724/crypto-monitoring` 저장소 삭제 결정 (작업 영향 없음)
 
 ### 잔여 — cron schedule 발화
@@ -149,6 +150,14 @@ Stage 3 적재 + catalog 5000위 + FET 검증 완료 상태. 추천 흐름은 **
 ---
 
 ## 의사결정 로그
+
+### 2026-05-18 (Stage 4 LLM 분류 — Gemini 무료 tier)
+- **Anthropic → Gemini 전환** — Why: Anthropic API는 무료 크레딧 없이 결제 등록 필수. 사용자 무료 옵션 요구로 Google AI Studio Gemini 무료 tier 채택. 본 워커 규모(매시간 ~10건)는 무료 한도 안.
+- **gemini-2.5-flash-lite + thinking_budget=0** — Why: 2.5 시리즈는 thinking 모델이라 응답 전 내부 추론에 max_output_tokens 소진 → 응답 텍스트가 비거나 '{' 단독으로 끊겨 parse 실패. ThinkingConfig(thinking_budget=0)로 비활성. 분류는 단순 작업이라 lite 모델로 품질 손실 없음.
+- **무료 RPD 20건 한도 발견** — Why: gemini-2.5-flash·flash-lite 둘 다 무료 일별 한도 20건(공식 문서엔 1000+ 표기되나 실제 quotaId 'PerDay' value 20). 본 워커 102건 백필을 한 번에 처리 불가. 사용자 결정 — cron 매시간 :15 UTC 자동 발화로 약 4일에 걸쳐 점진 분류. 결제 등록 시 paid tier로 즉시 완료 가능하나 본 단계는 무료 유지.
+- **FATAL 분류 정교화** — Why: 첫 dispatch에서 "billing" 키워드가 분당 quota 메시지("check your plan and billing details")에 포함되어 일시적 RPM 초과를 영구 오류로 잘못 abort. "billing" 단독 매칭 제거, "PerDay"·"api key not valid"·"permission denied"·"unauthenticated"·"user location is not supported"만 fatal. 분당 quota는 Gemini 응답의 retryDelay 추출해 정확한 sleep.
+- **호출간 sleep 6→13→7s** — Why: 2.5-flash RPM 5, 2.5-flash-lite RPM 10 — 실측 후 조정. 분당 ~8.5 호출로 안전 마진.
+- **NewsFeed UI — sentiment 배지 + event 태그** — Why: 분류 결과 시각화. positive 녹 / neutral 노 / negative 빨 배지 + 카테고리 한국어 태그. 분류 안 된 뉴스는 기존 메타라인만 표시(점진 백필 친화). PostgREST 1:1 임베딩 사용.
 
 ### 2026-05-18 (catalog 5000위 + 동적 모드 + ChartModal fix)
 - **coins_catalog 도입 — symbol 동적 매핑** — Why: 사용자가 FET를 보유 추가했을 때 워커가 시세를 못 가져옴. 정적 `coingecko_ids.py` 15종 한계. CoinGecko `/coins/markets`로 시총 5000위 메타데이터를 일 1회 적재하고 portfolio_holdings에서 unique symbol 추출 후 catalog로 id 해소. 사용자가 자유롭게 추가해도 워커가 자동 따라감.

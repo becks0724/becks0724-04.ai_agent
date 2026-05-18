@@ -14,11 +14,12 @@
   - 2-C 공포·탐욕 지수 (Alternative.me 무료, 일 1회. 헤더 위젯 — 분류별 색상)
   - 2-D RSI 14 / MACD 12,26,9 (pandas, `indicators` 테이블 279행 적재). BTC RSI 35.80 / ETH 23.84 / SOL 41.86.
   - 2-E 차트 모달 (lightweight-charts v5.2, line chart + 최신 RSI/MACD 텍스트, ESC 닫기, 면책 문구). HoldingsList "차트" 버튼으로 호출.
-- **Stage 3 뉴스 완료 (검증 통과)** — RSS 4 sources(CoinDesk/Cointelegraph/Bitcoin Magazine/Decrypt) + `news`/`news_ticker_map` 모델 + `ticker_matcher` + NewsFeed UI + `news-poll.yml` 매시간 :05 UTC. **첫 적재 102 entries / 69 ticker_links 검증 완료**.
-- **Stage 2.6 coins_catalog + 동적 모드 완료** — `coins_catalog` 5000위(0006 SQL + pass1/2 rate limit 대응 폴러). price/candle/indicators 모두 POLL_SYMBOLS 비어있으면 portfolio_holdings 기반 동적 매핑(catalog 우선 → 정적 fallback). HoldingForm datalist 자동완성. FET 알트 추가 → 4 워크플로 모두 정상 동작 검증.
-- **ChartModal fix** — UTCTimestamp+dedup으로 line 렌더링 안정화, MACD 값 가변 정밀도 표시.
-- **워커 호스팅** — GitHub Actions cron 6개 워크플로 (price-poll 15분, fear-greed 01:00, candle-poll 01:15, indicators 01:30, news-poll 매시간 :05, **coins-catalog 02:00**). 모든 workflow_dispatch 성공. price/candle/indicators는 동적 심볼 모드 기본.
-- **다음 본 작업** — Stage 4(LLM 감성, Anthropic key 필요) 또는 Stage 2.5(강세장 정점, CMC key 필요).
+- **Stage 3 뉴스 완료** — RSS 4 sources + `news`/`news_ticker_map` + `news-poll.yml`. 첫 적재 102 entries / 69 ticker_links 검증 완료.
+- **Stage 2.6 coins_catalog + 동적 모드 완료** — `coins_catalog` 5000위 + 워커 동적 매핑 + HoldingForm 자동완성 + FET 검증.
+- **ChartModal fix** — UTCTimestamp+dedup, MACD 가변 정밀도.
+- **Stage 4 LLM 분류 코드 완료, 점진 백필** — Google Gemini 무료 tier(`gemini-2.5-flash-lite`, thinking_budget=0). news_classifications + news_classifier + news-classify.yml(매시간 :15 UTC) + NewsFeed 배지/태그. **무료 RPD 20 한도** — cron이 일 ~20건씩 약 4일에 걸쳐 102건 백필. 현재 약 34건 적재.
+- **워커 호스팅** — GitHub Actions cron **7개 워크플로** (price-poll 15분, fear-greed 01:00, candle-poll 01:15, indicators 01:30, news-poll 매시간 :05, coins-catalog 02:00, **news-classify 매시간 :15**). 모든 workflow_dispatch 성공.
+- **다음 본 작업** — Stage 2.5(강세장 정점, CMC key 필요) 또는 Stage 5(실시간화).
 - 세부 진행 사항은 `progress.md`, 작업 단위 체크리스트는 `checklist.md`.
 
 ## 기술 스택
@@ -36,7 +37,8 @@
 │   ├── candle-poll.yml      # 15 1 * * * 일봉 폴러 (workflow_dispatch days input, 동적 모드)
 │   ├── indicators.yml       # 30 1 * * * RSI/MACD 계산 (동적 모드)
 │   ├── news-poll.yml        # 5 * * * * RSS 4 sources 뉴스 폴러
-│   └── coins-catalog.yml    # 0 2 * * * 시총 5000위 메타데이터 (workflow_dispatch total input)
+│   ├── coins-catalog.yml    # 0 2 * * * 시총 5000위 메타데이터 (workflow_dispatch total input)
+│   └── news-classify.yml    # 15 * * * * Gemini 분류 (workflow_dispatch batch input)
 ├── frontend/                # React + Vite TS (Vercel 배포)
 │   ├── src/lib/             # supabase, useAuth(AuthContext), holdings, prices, fx, errors, fearGreed, candles, indicatorsApi, news, coins
 │   └── src/components/      # Login, AppShell, HoldingForm(자동완성), HoldingsList, ChartModal, NewsFeed
@@ -49,8 +51,9 @@
 │   ├── ticker_matcher.py    # 뉴스 본문 → 심볼 키워드 매칭
 │   ├── coins_catalog_poller.py # CoinGecko /coins/markets 5000위 적재 (pass1/2 재시도)
 │   ├── symbol_resolver.py   # portfolio_holdings → coins_catalog 동적 매핑
+│   ├── news_classifier.py   # Gemini 2.5 Flash-Lite (sentiment + event_category, JSON 응답)
 │   ├── coingecko_ids.py     # 심볼 → coingecko_id 정적 매핑 (15종, fallback용)
-│   └── migrations/          # 0001_init / 0002_candles / 0003_fear_greed / 0004_indicators / 0005_news / 0006_coins_catalog
+│   └── migrations/          # 0001_init / 0002_candles / 0003_fear_greed / 0004_indicators / 0005_news / 0006_coins_catalog / 0007_news_classifications
 ├── CLAUDE.md
 ├── checklist.md
 └── progress.md
