@@ -1,0 +1,52 @@
+# news 테이블의 미분류 건을 Claude Haiku로 sentiment + event_category 분류해 news_classifications에 적재한다.
+# 워커는 POLL_ONCE=1 모드로 1회 batch 처리 후 종료. news-poll(매시간 :05) 직후 :15에 발화.
+#
+# 주기: 매시간 :15 UTC.
+
+name: news classifier
+
+on:
+  schedule:
+    - cron: '15 * * * *'
+  workflow_dispatch:
+    inputs:
+      batch:
+        description: '1회 처리할 미분류 뉴스 건수 (기본 25)'
+        required: false
+        default: '25'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: news-classify
+  cancel-in-progress: false
+
+jobs:
+  classify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: worker/requirements.txt
+
+      - name: Install deps
+        run: pip install -r worker/requirements.txt
+
+      - name: Run classifier (1회 배치)
+        working-directory: worker
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          POLL_ONCE: '1'
+          CLASSIFY_BATCH_SIZE: ${{ inputs.batch || '25' }}
+          WORKER_ENV: github-actions
+        run: python news_classifier.py

@@ -3,3 +3,4 @@ httpx>=0.27.0
 supabase>=2.7.0
 pandas>=2.2.0
 feedparser>=6.0.10
+anthropic>=0.40.0
