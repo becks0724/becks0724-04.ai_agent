@@ -62,12 +62,17 @@ export function ChartModal({ symbol, onClose }: Props) {
       color: '#3b82f6',
       lineWidth: 2,
     })
-    series.setData(
-      candles.map((c) => ({
-        time: c.openTime.slice(0, 10),
-        value: c.close,
-      })),
-    )
+    // UTCTimestamp(초) 사용 + ts 기준 dedup(과거 dispatch와 백필이 같은 일자에 다른 시각으로 적재됐을 수 있음).
+    const dataMap = new Map<number, number>()
+    for (const c of candles) {
+      const ts = Math.floor(new Date(c.openTime).getTime() / 1000)
+      if (!Number.isFinite(ts)) continue
+      dataMap.set(ts, c.close)
+    }
+    const data = Array.from(dataMap.entries())
+      .sort((a, b) => a[0] - b[0])
+      .map(([time, value]) => ({ time: time as never, value }))
+    series.setData(data)
     chart.timeScale().fitContent()
 
     const onResize = () => {
@@ -93,7 +98,16 @@ export function ChartModal({ symbol, onClose }: Props) {
   }, [onClose])
 
   const latestInd = indicators.length > 0 ? indicators[indicators.length - 1] : null
-  const fmt = (v: number | null) => (v === null ? '—' : v.toFixed(2))
+  // 값 크기에 따라 표시 정밀도 가변 — 큰 값(MACD 226)은 소수점 줄이고, 작은 값(FET MACD 0.0048)은 늘려 0으로 보이지 않게.
+  const fmt = (v: number | null): string => {
+    if (v === null) return '—'
+    const abs = Math.abs(v)
+    if (abs === 0) return '0'
+    if (abs >= 100) return v.toFixed(2)
+    if (abs >= 1) return v.toFixed(3)
+    if (abs >= 0.01) return v.toFixed(4)
+    return v.toFixed(6)
+  }
 
   return (
     <div style={styles.backdrop} onClick={onClose}>
