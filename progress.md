@@ -4,8 +4,17 @@
 
 ---
 
-## 현재 상태 (2026-05-18 KST 추가, 본 세션 누적 commit 16건)
-**Stage 3 검증 + catalog 5000위 + 워커 동적 모드 + ChartModal fix + Stage 4 코드 완료 + Gemini 무료 분류 약 34건 적재.** 본 세션 핵심 — (1) Stage 3 news-poll 검증(102 entries, 69 ticker_links), (2) coins_catalog 5000위 (pass1/2 rate limit 대응), (3) price/candle/indicators 동적 심볼 모드, (4) HoldingForm 자동완성, (5) FET 4-symbol 4 워크플로 검증, (6) ChartModal UTCTimestamp+dedup, (7) **Stage 4 LLM 분류 — Anthropic→Gemini 전환(무료 요구), gemini-2.5-flash-lite + thinking_budget=0, 분당 quota는 retryDelay 사용 + 일별 quota만 fatal, NewsFeed UI 배지/태그 통합**. **Gemini 무료 RPD가 모델 무관 20건뿐**으로 확인 — 분류는 cron 매시간 :15 UTC가 점진 처리(약 4일 후 102건 완료). 다음 분기점: Stage 2.5(강세장 정점, CMC key 필요).
+## 현재 상태 (2026-05-18 KST 세션 마감, 본 세션 누적 commit 18건 `8f46eae`→`3803a27`)
+
+**한 줄 요약** — Stage 3 검증·Stage 2.6 catalog·Stage 4 LLM 분류 코드 완료. 분류는 Gemini 무료 RPD 20 한도로 cron이 약 4일 자동 백필.
+
+**본 세션 산출 6대 묶음**
+1. **Stage 3 적재 검증** — RSS 4 sources(CoinDesk/Cointelegraph/Bitcoin Magazine/Decrypt) × news-poll workflow → 102 entries / 69 ticker_links 1회 적재 완료.
+2. **Stage 2.6 coins_catalog 5000위 + 워커 동적 심볼 모드** — `coins_catalog` 테이블(0006 SQL) + 폴러(pass1/2 rate limit 재시도) + `symbol_resolver` + price/candle/indicators 모두 `POLL_SYMBOLS` 비어있으면 portfolio_holdings 기반 동적 매핑. 사용자가 FET 알트 추가 → 4 워크플로 모두 정상 검증.
+3. **HoldingForm datalist 자동완성** — 5000개 코인 ilike 검색, 200ms 디바운스.
+4. **ChartModal line 렌더링 fix** — UTCTimestamp+dedup으로 BusinessDay 키 중복 회피, MACD 가변 정밀도 표시.
+5. **Stage 4 LLM 분류 코드 완료** — Anthropic 결제 요구 → Google Gemini 2.5 Flash-Lite 전환. thinking_budget=0 + response_mime_type=json + temperature 0.2. 분당/일별 quota 정교 분리(retryDelay 추출, "PerDay"만 fatal). NewsFeed UI에 sentiment 배지(positive 녹/neutral 노/negative 빨) + event 카테고리 태그.
+6. **Stage 4 백필 약 34/102건 적재** — Gemini 무료 RPD 20 한도 안에서 cron 매시간 :15 UTC가 점진 처리. 다양한 분포 확인(positive/neutral/negative × tech/regulation/general/hack/partnership/listing).
 
 | 영역 | 상태 | 비고 |
 |---|---|---|
@@ -118,23 +127,30 @@ session prop이 `App → AppShell`로, userId prop이 `AppShell → HoldingForm`
 
 ## 다음 할 일 (다음 세션 시작 시)
 
-### Stage 4 분류 자동 진행
-- 본 세션 마감 시점에 약 34/102건 분류 적재. **다음 trigger 불필요** — `news-classify.yml` cron 매시간 :15 UTC가 일별 RPD 20건 한도 안에서 점진 처리 (약 4일 후 완료).
-- prod URL 시각 검증: NewsFeed 항목에 sentiment 배지(긍정 녹/중립 노/부정 빨) + category 태그(상장/규제/해킹/파트너십/기술/일반) 표시. 분류 안 된 신규 뉴스는 배지 없이 표시.
+### 자동 진행 (사용자 액션 없음, 그저 대기)
+- `news-classify.yml` cron 매시간 :15 UTC × Gemini RPD 20건 → 약 4일 뒤 102건 백필 완료. 그 후 신규 RSS(news-poll :05) 뉴스도 자동 분류.
+- 다른 모든 cron 워크플로 정상 (price-poll 15분, fear-greed 01:00, candle-poll 01:15, indicators 01:30, news-poll :05, coins-catalog 02:00).
+
+### 시각 검증 (사용자 브라우저)
+- prod URL [crypto-monitoring-one.vercel.app](https://crypto-monitoring-one.vercel.app)
+- **HoldingForm** — 심볼 입력 시 datalist 자동완성 (예: `bitc` → Bitcoin #1)
+- **ChartModal FET line** — `5383e69` 배포 후 line 표시 + RSI/MACD 가변 정밀도
+- **NewsFeed 배지/태그** — sentiment 배지(positive 녹/neutral 노/negative 빨) + category 태그(상장/규제/해킹/파트너십/기술/일반). 분류 안 된 신규 뉴스는 배지 없이 표시.
 - 검증 쿼리(SQL Editor):
   ```sql
   select sentiment, count(*) from news_classifications group by sentiment order by 2 desc;
   select event_category, count(*) from news_classifications group by event_category order by 2 desc;
+  select source, count(*) from news group by source order by 2 desc;
   ```
 
-### 본 작업 — Stage 2.5 (강세장 정점 신호)
-- 사용자 액션 — CMC Pro Basic API key 발급 (무료, 10k credits/월)
-- 그 후: peak_signals 테이블, CMC Altcoin Season Index 어댑터, CoinGecko 자체 계산 18-23개
+### 본 작업 분기점 (사용자 선택)
+- **Stage 2.5 — 강세장 정점 신호 (CMC key 필요)** — peak_signals 테이블 + CMC Altcoin Season Index 어댑터 + CoinGecko 자체 계산 18-23개. 사용자 액션 — CMC Pro Basic API key 발급(무료, 10k credits/월).
+- **Stage 5 — 실시간화** — WebSocket, Fly.io 등 long-running 호스팅으로 이전 검토 (현재 GitHub Actions cron은 30초 폴링 불가).
 
 ### 단기 잔여
-- prod URL 시각 검증 — ChartModal FET line(`5383e69`) + NewsFeed 배지/태그 표시
-- cron schedule 발화 모니터링
 - 빈 `becks0724/crypto-monitoring` 저장소 삭제 결정 (작업 영향 없음)
+- cron schedule 발화 모니터링 — 본 세션 5/17 04-05 UTC 1건씩 관측 후 추가 누적
+- **분류 paid tier 전환 검토 (선택)** — Gemini paid는 RPD/RPM 제한 해제 + 비용 극소. 사용자 결정.
 
 ### 잔여 — cron schedule 발화
 - price-poll.yml `*/15` 실제 발화 간격은 ~1시간 (자동 발화는 되나 빈도가 cron보다 낮음)
