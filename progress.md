@@ -4,8 +4,8 @@
 
 ---
 
-## 현재 상태 (2026-05-18 KST 09:35)
-**Stage 2 백엔드 4건 모두 완료 + Stage 2-E 차트 모달 UI 완료.** Stage 2-A(캔들 모델)·2-B(캔들 폴러)·2-C(공포·탐욕 백엔드+UI)·2-D(RSI/MACD) 모두 workflow_dispatch 검증 통과. candle 90일 백필 273행 + indicators 279행 적재 — BTC RSI 35.80 / ETH 23.84 (oversold) / SOL 41.86, MACD 정상. 2-E ChartModal은 lightweight-charts v5.2로 line chart + 최신 RSI/MACD 텍스트 + ESC 닫기 + 면책 문구. HoldingsList의 "차트" 버튼으로 호출. **cron schedule 자동 발화 1건 관측됨** (indicators.yml 5/17 05:06 UTC, 지연 3.5h — best-effort 한계 안에서 동작은 확인). 다음 분기점: Stage 3(뉴스) 또는 Stage 2.5(강세장 정점 신호).
+## 현재 상태 (2026-05-18 KST 추가)
+**Stage 3 코드 완료 — 사용자 SQL 실행 + workflow_dispatch 검증 대기.** RSS 4 소스(CoinDesk/Cointelegraph/Bitcoin Magazine/Decrypt) 폴러 + news/news_ticker_map 모델 + 보유 종목 필터링 NewsFeed UI까지 한 묶음으로 push 완료(`8f46eae`+`b78601c`). 코드 dry-run에서 3소스 92 entries 파싱 + 심볼 매칭(BTC/ETH/SOL/USDC 등) 정상 검증. **남은 사용자 액션** — `worker/migrations/0005_news.sql` Supabase SQL Editor 실행. 그 다음 `gh workflow run news-poll.yml`로 적재 검증. cron 누적: candle/indicators/fear-greed 각 schedule 1건 관측(5/17 04-05 UTC, 동일한 ~3.5h 지연), price-poll(15분 cron)은 실제 ~1시간 간격으로만 발화 — GitHub Free best-effort 한계 재확인.
 
 | 영역 | 상태 | 비고 |
 |---|---|---|
@@ -20,6 +20,8 @@
 | Stage 2-C 공포·탐욕 | ✓ | Alternative.me 무료, value=31 Fear 적재. AppShell 헤더 위젯 (분류별 색상) |
 | Stage 2-D 지표 | ✓ | RSI 14·MACD 12/26/9 pandas. 279행 적재 (BTC RSI 35.80, ETH 23.84, SOL 41.86). candle 90일 백필 옵션 추가 |
 | Stage 2-E 차트 UI | ✓ | lightweight-charts v5.2 모달, line chart + 최신 RSI/MACD 텍스트, ESC 닫기, 면책 문구. HoldingsList "차트" 버튼 |
+| Stage 3 뉴스 (코드) | ✓ | RSS 4 sources + ticker_matcher(키워드 17개→13 심볼) + news/news_ticker_map(0005 SQL) + NewsFeed(보유/전체 탭) + news-poll.yml(매시간 :05 UTC) |
+| Stage 3 뉴스 (검증) | ⏳ | 0005 SQL **사용자 액션 보류**. 그 후 workflow_dispatch news-poll로 적재 검증 |
 
 ---
 
@@ -116,21 +118,21 @@ session prop이 `App → AppShell`로, userId prop이 `AppShell → HoldingForm`
 
 ## 다음 할 일 (다음 세션 시작 시)
 
-### 본 작업 — Stage 3 진입 (뉴스 수집) 또는 Stage 2.5 (강세장 정점 신호)
-사용자 선택. 추천 흐름은 Stage 3 (외부 API key 필요 최소, news 테이블 + RSS 파서가 자연스러운 다음 흐름).
+### Stage 3 검증 (가장 시급 — 사용자 액션 + 워커 트리거)
+1. **사용자 액션** — Supabase SQL Editor에서 `worker/migrations/0005_news.sql` 실행. news (url unique) + news_ticker_map (composite PK) + RLS 각 2정책 생성 확인.
+2. `gh workflow run news-poll.yml` → 적재 검증
+   - 기대값: news 수십-수백 행 (RSS 4 sources × 20-30 entries), news_ticker_map은 매칭 심볼 수만큼
+   - 검증 쿼리: `select source, count(*) from news group by source;` / `select symbol, count(*) from news_ticker_map group by symbol order by 2 desc;`
+3. prod URL 시각 검증 — `crypto-monitoring-one.vercel.app`에서 NewsFeed "보유 종목" / "전체" 탭 동작 확인.
 
-**Stage 3 진입 시 첫 작업**
-- 데이터 모델: `worker/migrations/0005_news.sql` — news 테이블 (id, source, title, url, published_at, raw_content) + news_ticker_map
-- 워커: CryptoPanic API 클라이언트 (free public posts 또는 free key 필요) + RSS 파서
-- 중복 제거: URL 해시 또는 콘텐츠 해시
-- 프론트: 보유 종목 필터링 뉴스 피드
-
-**Stage 2.5 진입 시 사전 액션**
-- 사용자 — CMC Pro Basic API key 발급 (무료, 10k credits/월)
-- 그 후: peak_signals 테이블, CMC Altcoin Season Index 어댑터, CoinGecko 자체 계산(Pi Cycle/200d MA 등) 18-23개 구현
+### 본 작업 — Stage 4 (LLM 감성 분석) 또는 Stage 2.5 (강세장 정점 신호)
+Stage 3 검증 완료 후 분기점. 추천: Stage 4 (RSS 적재된 뉴스에 LLM 분류 백필 — 자연스러운 흐름).
+- **Stage 4 사전 액션** — Anthropic / OpenAI API key 발급 (사용자)
+- **Stage 2.5 사전 액션** — CMC Pro Basic API key 발급 (무료, 10k credits/월)
 
 ### 잔여 — cron schedule 발화
-- price-poll.yml `*/15` 자동 발화는 여전히 미관측. indicators.yml은 1건 관측됨(3.5h 지연)
+- price-poll.yml `*/15` 실제 발화 간격은 ~1시간(자동 발화는 되나 빈도가 cron보다 낮음)
+- 일 1회 워크플로 3건(fear-greed/candle/indicators)은 모두 schedule 1건씩 관측되었으나 예약 시각 대비 ~3.5h 지연
 - GitHub Free best-effort 한계. 외부 cron(cron-job.org PAT) 또는 Fly.io 이전은 사용자 결정 보류
 
 ---
@@ -142,6 +144,13 @@ session prop이 `App → AppShell`로, userId prop이 `AppShell → HoldingForm`
 ---
 
 ## 의사결정 로그
+
+### 2026-05-18 (Stage 3 코드 완료)
+- **Stage 3 출처 — RSS 우선, CryptoPanic 보류** — Why: RSS 4종(CoinDesk/Cointelegraph/Bitcoin Magazine/Decrypt)은 키 불필요. CryptoPanic은 무료 키 발급이 필요해 사용자 액션 발생. RSS 적재 검증 후 CryptoPanic 어댑터를 옵션으로 추가하는 게 자연스러운 흐름.
+- **티커 매칭 — 키워드 word-boundary, link/ton/dot 단독 제외** — Why: 단순 substring 매칭은 'link'(URL), 'ton'(무게), 'dot'(점) 등 일반어와 충돌. 풀네임(chainlink/toncoin/polkadot)만 매칭하면 false positive 차단. 1단계 키워드 17개 → 13 심볼. 미스 시 워커가 무해(매핑이 비어 적재만 됨).
+- **중복 제거 — URL UNIQUE 만으로 충분** — Why: 동일 URL 재발행 빈도 낮음. 콘텐츠 해시(sha256(title))는 운영 중 중복 패턴 발견 시 추가. 현 단계는 단순성 우선.
+- **NewsFeed UI — 보유/전체 탭, 5분 polling** — Why: 뉴스는 분 단위 갱신 불필요. 5분이면 RSS 폴러 주기(1시간)보다 자주라 UX 충분. 보유 종목 탭은 매칭된 뉴스가 없을 때 명시적 빈 상태 안내.
+- **두 commit으로 분리** — Why: backend(SQL+워커+워크플로)와 frontend(피드 UI)는 의존 없음. backend는 사용자 SQL 실행 + workflow_dispatch로 독립 검증 가능. CLAUDE.md §11 "한 문장으로 설명 가능한 단위" 충족.
 
 ### 2026-05-18 (Stage 2 완료)
 - **OHLCV 출처 — CoinGecko market_chart 채택, close 위주** — Why: CoinGecko 무료 plan의 `/coins/{id}/ohlc`는 days≥30에서 4일봉만 제공해 일봉 OHLC 미지원. `/coins/{id}/market_chart?interval=daily`는 prices(close)+total_volumes 제공. 진짜 일봉 OHLC가 필요해지면(Stage 2-D 차트 시각화 요구) Binance Klines 무료 API로 전환 옵션 보존. 현재는 open/high/low=close로 채워 NOT NULL 만족. RSI/MACD/Pi Cycle 등 close 기반 지표엔 영향 없음.

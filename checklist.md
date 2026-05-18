@@ -194,14 +194,25 @@
 
 ---
 
-## Stage 3 · 뉴스 수집 + 티커 매핑
+## Stage 3 · 뉴스 수집 + 티커 매핑 ★ 진행 중 (검증 대기)
 
-- [ ] CryptoPanic API 클라이언트 (worker)
-- [ ] RSS 피드 파서 (worker)
-- [ ] 뉴스 저장 테이블 설계 (id, source, title, url, published_at, raw_content)
-- [ ] 본문에서 티커 추출 → 매핑 테이블 (`news_ticker_map`)
-- [ ] 중복 뉴스 제거 (URL 또는 콘텐츠 해시)
-- [ ] 프론트 뉴스 피드 UI — 보유 종목 필터링
+> 설계 결정 (2026-05-18)
+> - **출처** — RSS 우선 (키 불필요). CryptoPanic은 사용자 키 발급 후 추가 옵션으로 보류.
+> - **RSS 소스 4종** — CoinDesk, Cointelegraph, Bitcoin Magazine, Decrypt.
+> - **티커 매칭** — 키워드 word-boundary 매칭. 일반어 충돌 위험으로 `link`/`ton`/`dot` 단독 키워드 제외(`chainlink`/`toncoin`/`polkadot` 풀네임만 허용).
+> - **중복 제거** — `news.url` UNIQUE upsert로 충분. 콘텐츠 해시는 동일 URL 재발행 빈도 낮아 보류.
+> - **주기** — 매시간 :05 UTC (cron `5 * * * *`).
+
+- [x] RSS 피드 파서 (worker) — `worker/news_poller.py`, feedparser + httpx, 4 sources, dry-run 92 entries 파싱 확인
+- [x] 뉴스 저장 테이블 설계 — `worker/migrations/0005_news.sql` (news.url UNIQUE + news_ticker_map composite PK, 각 RLS 2정책)
+- [x] 본문에서 티커 추출 → 매핑 테이블 — `worker/ticker_matcher.py` 키워드 dict 17개 → 13 심볼 매핑
+- [x] 중복 뉴스 제거 — news.url UNIQUE 제약 + supabase upsert(on_conflict=url)
+- [x] 프론트 뉴스 피드 UI — 보유 종목 필터링 — `frontend/src/lib/news.ts` + `NewsFeed.tsx` (보유/전체 탭, 5분 polling). 빌드 580KB / gzip 171.87KB
+- [x] GitHub Actions — `.github/workflows/news-poll.yml` (cron `5 * * * *` + workflow_dispatch feeds input)
+- [~] CryptoPanic API 클라이언트 (worker) — **보류**. 사용자 키 발급 후 별도 폴러 또는 news_poller에 어댑터 추가
+- [ ] **사용자 액션** — Supabase SQL Editor에서 `worker/migrations/0005_news.sql` 실행
+- [ ] workflow_dispatch news-poll → Supabase `news` 적재 + `news_ticker_map` 매핑 검증
+- [ ] prod URL 시각 검증 — NewsFeed 보유 종목 탭/전체 탭 동작 확인
 
 ---
 

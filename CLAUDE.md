@@ -14,8 +14,9 @@
   - 2-C 공포·탐욕 지수 (Alternative.me 무료, 일 1회. 헤더 위젯 — 분류별 색상)
   - 2-D RSI 14 / MACD 12,26,9 (pandas, `indicators` 테이블 279행 적재). BTC RSI 35.80 / ETH 23.84 / SOL 41.86.
   - 2-E 차트 모달 (lightweight-charts v5.2, line chart + 최신 RSI/MACD 텍스트, ESC 닫기, 면책 문구). HoldingsList "차트" 버튼으로 호출.
-- **워커 호스팅** — GitHub Actions cron 4개 워크플로 (price-poll 15분, fear-greed 01:00 UTC, candle-poll 01:15, indicators 01:30). schedule 자동 발화는 1건 관측 (indicators 5/17 05:06 UTC, 3.5h 지연). 모든 workflow_dispatch는 정상.
-- **다음 본 작업** — Stage 3(뉴스 수집) 또는 Stage 2.5(강세장 정점 신호, CMC API key 발급 필요).
+- **Stage 3 코드 완료, 검증 대기** — RSS 4 sources(CoinDesk/Cointelegraph/Bitcoin Magazine/Decrypt) 폴러 + `news`/`news_ticker_map` 모델(0005 SQL) + `ticker_matcher`(키워드 17개 → 13 심볼, link/ton/dot 단독 제외) + NewsFeed UI(보유/전체 탭, 5분 polling) + `news-poll.yml`(매시간 :05 UTC). 사용자 SQL 실행 + workflow_dispatch 검증 보류.
+- **워커 호스팅** — GitHub Actions cron 5개 워크플로 (price-poll 15분, fear-greed 01:00 UTC, candle-poll 01:15, indicators 01:30, news-poll 매시간 :05). schedule 자동 발화는 일 1회 워크플로 3개 각 1건씩 관측 (5/17 04-05 UTC, ~3.5h 지연). price-poll(15분)은 실제 ~1시간 간격 발화. 모든 workflow_dispatch는 정상.
+- **다음 본 작업** — Stage 3 검증 완료 후 Stage 4(LLM 감성) 또는 Stage 2.5(강세장 정점, CMC API key 발급 필요).
 - 세부 진행 사항은 `progress.md`, 작업 단위 체크리스트는 `checklist.md`.
 
 ## 기술 스택
@@ -31,17 +32,20 @@
 │   ├── price-poll.yml       # */15 * * * * 가격 폴러
 │   ├── fear-greed.yml       # 0 1 * * * 공포·탐욕 폴러
 │   ├── candle-poll.yml      # 15 1 * * * 일봉 폴러 (workflow_dispatch days input)
-│   └── indicators.yml       # 30 1 * * * RSI/MACD 계산
+│   ├── indicators.yml       # 30 1 * * * RSI/MACD 계산
+│   └── news-poll.yml        # 5 * * * * RSS 4 sources 뉴스 폴러 (workflow_dispatch feeds input)
 ├── frontend/                # React + Vite TS (Vercel 배포)
-│   ├── src/lib/             # supabase, useAuth(AuthContext), holdings, prices, fx, errors, fearGreed, candles, indicatorsApi
-│   └── src/components/      # Login, AppShell, HoldingForm, HoldingsList, ChartModal
+│   ├── src/lib/             # supabase, useAuth(AuthContext), holdings, prices, fx, errors, fearGreed, candles, indicatorsApi, news
+│   └── src/components/      # Login, AppShell, HoldingForm, HoldingsList, ChartModal, NewsFeed
 ├── worker/                  # Python 3.11
 │   ├── price_poller.py      # CoinGecko /simple/price
 │   ├── fear_greed_poller.py # Alternative.me /fng
 │   ├── candle_poller.py     # CoinGecko /coins/{id}/market_chart
 │   ├── indicators.py        # pandas RSI/MACD
+│   ├── news_poller.py       # RSS 4 sources (CoinDesk/Cointelegraph/Bitcoin Magazine/Decrypt)
+│   ├── ticker_matcher.py    # 뉴스 본문 → 심볼 키워드 매칭
 │   ├── coingecko_ids.py     # 심볼 → coingecko_id 매핑 (15종)
-│   └── migrations/          # 0001_init / 0002_candles / 0003_fear_greed / 0004_indicators
+│   └── migrations/          # 0001_init / 0002_candles / 0003_fear_greed / 0004_indicators / 0005_news
 ├── CLAUDE.md
 ├── checklist.md
 └── progress.md
