@@ -13,10 +13,11 @@ export type NewsItem = {
   sentiment: Sentiment | null
   eventCategory: EventCategory | null
   confidence: number | null
+  symbols: string[]
 }
 
 const NEWS_SELECT =
-  'id, source, title, url, published_at, news_classifications(sentiment, event_category, confidence)'
+  'id, source, title, url, published_at, news_classifications(sentiment, event_category, confidence), news_ticker_map(symbol)'
 
 export async function fetchLatestNews(limit = 20): Promise<NewsItem[]> {
   const { data, error } = await supabase
@@ -55,6 +56,8 @@ type ClassificationRow = {
   confidence: number | null
 }
 
+type TickerRow = { symbol: string }
+
 type NewsRow = {
   id: number
   source: string
@@ -63,12 +66,17 @@ type NewsRow = {
   published_at: string | null
   // PostgREST 1:1 임베딩은 객체 또는 null. 일부 환경에선 배열로도 돌아올 수 있어 양쪽 다 방어.
   news_classifications: ClassificationRow | ClassificationRow[] | null
+  // 1:N 임베딩은 항상 배열 (null도 가능).
+  news_ticker_map: TickerRow[] | null
 }
 
 function toItem(row: NewsRow): NewsItem {
   const c = Array.isArray(row.news_classifications)
     ? row.news_classifications[0] ?? null
     : row.news_classifications
+  const symbols = (row.news_ticker_map ?? [])
+    .map((t) => t.symbol)
+    .filter((s): s is string => Boolean(s))
   return {
     id: row.id,
     source: row.source,
@@ -78,5 +86,6 @@ function toItem(row: NewsRow): NewsItem {
     sentiment: c?.sentiment ?? null,
     eventCategory: c?.event_category ?? null,
     confidence: c?.confidence ?? null,
+    symbols: Array.from(new Set(symbols)).sort(),
   }
 }
