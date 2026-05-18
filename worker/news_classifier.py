@@ -30,9 +30,9 @@ from supabase import Client, create_client
 
 DEFAULT_MODEL = "gemini-2.5-flash-lite"
 DEFAULT_BATCH = 30
-# Gemini Free tier gemini-2.5-flash-lite는 RPM 15, RPD 1000+. 5초 간격 → 분당 12 호출로 안전 마진.
+# gemini-2.5-flash-lite 실측 RPM 10. 7초 간격 → 분당 ~8.5 호출로 안전 마진.
 # (참고: gemini-2.5-flash는 RPD 20뿐이라 분류 워커엔 부적합.)
-DEFAULT_CALL_SLEEP = 5.0
+DEFAULT_CALL_SLEEP = 7.0
 MAX_TOKENS = 500
 MAX_RETRIES = 3
 BACKOFF_BASE_SECONDS = 4.0
@@ -40,13 +40,13 @@ BACKOFF_BASE_SECONDS = 4.0
 SENTIMENTS = {"positive", "neutral", "negative"}
 EVENT_CATEGORIES = {"listing", "regulation", "hack", "partnership", "tech", "general"}
 
-# 영구 오류 키워드(case-insensitive). "quota exceeded"는 일/분 단위 모두에 등장해 fatal 분류가 부적절.
-# 분당 한도는 sleep 후 재시도 가능, 일 한도는 다음 날까지 차단 — 메시지에 "PerDay"가 포함되면 fatal.
+# 영구 오류 키워드. 분당 quota 응답에도 "check your plan and billing details" 같은 일반 문구가
+# 포함되므로 "billing" 단독 매칭은 위험. 구체적 phrase 또는 명확한 키워드만 fatal로 분류한다.
+# 일별 quota("PerDay")만 영구 차단으로 본다 — 다음 날까지 cooldown 불가.
 FATAL_HINTS = (
     "api key not valid",
     "invalid api key",
     "permission denied",
-    "billing",
     "unauthenticated",
     "user location is not supported",
     "perday",  # GenerateRequestsPerDayPerProjectPerModel
