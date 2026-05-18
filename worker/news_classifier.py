@@ -28,10 +28,11 @@ from google.genai import errors as genai_errors
 from google.genai import types as genai_types
 from supabase import Client, create_client
 
-DEFAULT_MODEL = "gemini-2.5-flash"
-DEFAULT_BATCH = 10
-# Gemini Free tier gemini-2.5-flash는 분당 5 RPM. 13초 간격 → 분당 ~4.6 호출로 안전 마진.
-DEFAULT_CALL_SLEEP = 13.0
+DEFAULT_MODEL = "gemini-2.5-flash-lite"
+DEFAULT_BATCH = 30
+# Gemini Free tier gemini-2.5-flash-lite는 RPM 15, RPD 1000+. 5초 간격 → 분당 12 호출로 안전 마진.
+# (참고: gemini-2.5-flash는 RPD 20뿐이라 분류 워커엔 부적합.)
+DEFAULT_CALL_SLEEP = 5.0
 MAX_TOKENS = 500
 MAX_RETRIES = 3
 BACKOFF_BASE_SECONDS = 4.0

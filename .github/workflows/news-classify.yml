@@ -11,9 +11,9 @@ on:
   workflow_dispatch:
     inputs:
       batch:
-        description: '1회 처리할 미분류 뉴스 건수 (기본 10, Gemini 무료 일 250건 안전)'
+        description: '1회 처리할 미분류 뉴스 건수 (기본 30, gemini-2.5-flash-lite 무료 RPD 1000+ 안전)'
         required: false
-        default: '10'
+        default: '30'
 
 permissions:
   contents: read
@@ -47,6 +47,6 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           POLL_ONCE: '1'
-          CLASSIFY_BATCH_SIZE: ${{ inputs.batch || '10' }}
+          CLASSIFY_BATCH_SIZE: ${{ inputs.batch || '30' }}
           WORKER_ENV: github-actions
         run: python news_classifier.py
