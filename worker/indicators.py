@@ -112,7 +112,16 @@ def upsert_indicators(supabase: Client, symbol: str, df: pd.DataFrame) -> int:
         ).execute()
         return len(payload)
     except Exception as e:
-        print(f"[indicators] supabase upsert error for {symbol}: {e!r}", flush=True)
+        # PostgrestAPIError는 code/message/details/hint를 분리 노출. repr()로는 잘리는 경우가 있어 명시적으로 풀어 출력한다.
+        code = getattr(e, "code", None)
+        message = getattr(e, "message", None) or str(e)
+        details = getattr(e, "details", None)
+        hint = getattr(e, "hint", None)
+        print(
+            f"[indicators] supabase upsert error for {symbol}: "
+            f"type={type(e).__name__} code={code!r} message={message!r} details={details!r} hint={hint!r}",
+            flush=True,
+        )
         return 0
 
 
