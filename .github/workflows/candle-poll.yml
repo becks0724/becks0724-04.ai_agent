@@ -9,6 +9,11 @@ on:
   schedule:
     - cron: '15 1 * * *'
   workflow_dispatch:
+    inputs:
+      days:
+        description: 'CoinGecko market_chart days (1~365). 백필 시 90 권장.'
+        required: false
+        default: '2'
 
 permissions:
   contents: read
@@ -42,6 +47,7 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           POLL_SYMBOLS: BTC,ETH,SOL
           POLL_ONCE: '1'
-          CANDLE_DAYS: '2'
+          # workflow_dispatch에서 days 입력하면 override (백필용). schedule trigger에서는 빈 문자열 → '2' 폴백.
+          CANDLE_DAYS: ${{ inputs.days || '2' }}
           WORKER_ENV: github-actions
         run: python candle_poller.py
