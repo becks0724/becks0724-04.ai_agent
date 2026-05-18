@@ -1,0 +1,48 @@
+# 강세장 정점 신호(Bull Market Peak Signals)를 매일 1회 계산해 peak_signals 테이블에 적재.
+# candle-poll(01:15) + indicators(01:30) 이후 충분한 시간이 지난 02:30 UTC에 발화 — BTC 일봉이 적재된 뒤 SMA200/SMA350 계산이 의미를 가짐.
+#
+# 주기: 매일 02:30 UTC.
+
+name: peak signals poller
+
+on:
+  schedule:
+    - cron: '30 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: peak-signals
+  cancel-in-progress: false
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: worker/requirements.txt
+
+      - name: Install deps
+        run: pip install -r worker/requirements.txt
+
+      - name: Run poller (1회 적재)
+        working-directory: worker
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          # 사용자 옵션 — 발급 안 했으면 비어 있어도 워커는 무관 (관련 지표만 skip)
+          COINGLASS_API_KEY: ${{ secrets.COINGLASS_API_KEY }}
+          CMC_API_KEY: ${{ secrets.CMC_API_KEY }}
+          POLL_ONCE: '1'
+          WORKER_ENV: github-actions
+        run: python peak_signals_poller.py
