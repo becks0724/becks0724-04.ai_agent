@@ -256,7 +256,7 @@ function SummaryBox({
         </div>
         {totals.missingSymbols.length > 0 && (
           <div style={summaryStyles.warn}>
-            시세 미보유: {totals.missingSymbols.join(', ')} — 워커 POLL_SYMBOLS에 추가 필요
+            시세 미보유: {totals.missingSymbols.join(', ')} — 다음 워커 사이클(15분 이내)에서 자동 적재. catalog 미등록 심볼이면 계속 비어 있을 수 있음.
           </div>
         )}
         {pricesError && <div style={summaryStyles.warn}>가격 조회 오류: {pricesError}</div>}

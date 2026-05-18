@@ -45,7 +45,7 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          POLL_SYMBOLS: BTC,ETH,SOL
+          # POLL_SYMBOLS 미지정 → portfolio_holdings 동적 모드. coins_catalog로 id 자동 해소.
           POLL_ONCE: '1'
           # workflow_dispatch에서 days 입력하면 override (백필용). schedule trigger에서는 빈 문자열 → '2' 폴백.
           CANDLE_DAYS: ${{ inputs.days || '2' }}

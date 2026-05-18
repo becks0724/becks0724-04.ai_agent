@@ -45,7 +45,7 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          POLL_SYMBOLS: BTC,ETH,SOL
+          # POLL_SYMBOLS 미지정 → portfolio_holdings 동적 모드. coins_catalog(5000위)로 id 자동 해소.
           POLL_ONCE: '1'
           WORKER_ENV: github-actions
         run: python price_poller.py
