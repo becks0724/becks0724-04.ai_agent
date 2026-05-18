@@ -1,8 +1,23 @@
 // 보유 종목 또는 전체 최신 뉴스를 표시하는 피드. 5분 간격 polling.
 import { useEffect, useMemo, useState } from 'react'
 import { fetchLatestNews, fetchNewsForSymbols } from '../lib/news'
-import type { NewsItem } from '../lib/news'
+import type { EventCategory, NewsItem, Sentiment } from '../lib/news'
 import { normalizeError } from '../lib/errors'
+
+const SENTIMENT_META: Record<Sentiment, { label: string; bg: string; color: string }> = {
+  positive: { label: '긍정', bg: '#0e2a1d', color: '#86efac' },
+  neutral:  { label: '중립', bg: '#2a2510', color: '#facc15' },
+  negative: { label: '부정', bg: '#2a1212', color: '#fca5a5' },
+}
+
+const CATEGORY_LABEL: Record<EventCategory, string> = {
+  listing:     '상장',
+  regulation:  '규제',
+  hack:        '해킹',
+  partnership: '파트너십',
+  tech:        '기술',
+  general:     '일반',
+}
 
 const NEWS_POLL_MS = 5 * 60_000
 const NEWS_LIMIT = 20
@@ -93,6 +108,21 @@ export function NewsFeed({ symbols }: Props) {
             <div style={styles.meta}>
               <span style={styles.source}>{n.source}</span>
               {n.publishedAt && <span style={styles.published}>{fmtDate(n.publishedAt)}</span>}
+              {n.sentiment && (
+                <span
+                  style={{
+                    ...styles.badge,
+                    background: SENTIMENT_META[n.sentiment].bg,
+                    color: SENTIMENT_META[n.sentiment].color,
+                  }}
+                  title={n.confidence !== null ? `confidence ${n.confidence.toFixed(2)}` : ''}
+                >
+                  {SENTIMENT_META[n.sentiment].label}
+                </span>
+              )}
+              {n.eventCategory && (
+                <span style={styles.tag}>{CATEGORY_LABEL[n.eventCategory]}</span>
+              )}
             </div>
           </li>
         ))}
@@ -178,4 +208,18 @@ const styles: Record<string, React.CSSProperties> = {
   },
   source: { textTransform: 'uppercase', letterSpacing: '0.5px' },
   published: {},
+  badge: {
+    padding: '1px 6px',
+    borderRadius: '4px',
+    fontSize: '10px',
+    fontWeight: 600,
+  },
+  tag: {
+    padding: '1px 6px',
+    borderRadius: '4px',
+    fontSize: '10px',
+    color: '#9aa3ad',
+    background: '#11141a',
+    border: '1px solid #1c1f24',
+  },
 }
