@@ -4,8 +4,8 @@
 
 ---
 
-## 현재 상태 (2026-05-17 KST 04:00)
-**Stage 2 진입 — 백엔드 4건 중 3건 검증 완료.** Stage 1 MVP + auth 리팩토링 완료 후 Stage 2-A(캔들 모델)·2-B(캔들 폴러)·2-C(공포·탐욕 백엔드+UI)·2-D(RSI/MACD 코드)까지 진행. GitHub Actions workflow_dispatch 검증: fear-greed `value=31 Fear` 적재, candles BTC/ETH/SOL 각 3행(총 9건) 적재 완료. **2-D는 Supabase `0004_indicators.sql` 사용자 실행 보류 중** → 실행 완료 신호 시 indicators workflow_dispatch 자동 진행. 2-E 차트 UI는 lightweight-charts 도입 + 모달 방식으로 진행 예정. **cron schedule 자동 발화는 여전히 0건** (수동 트리거는 모두 성공 — workflow 자체는 정상).
+## 현재 상태 (2026-05-18 KST 09:35)
+**Stage 2 백엔드 4건 모두 완료 + Stage 2-E 차트 모달 UI 완료.** Stage 2-A(캔들 모델)·2-B(캔들 폴러)·2-C(공포·탐욕 백엔드+UI)·2-D(RSI/MACD) 모두 workflow_dispatch 검증 통과. candle 90일 백필 273행 + indicators 279행 적재 — BTC RSI 35.80 / ETH 23.84 (oversold) / SOL 41.86, MACD 정상. 2-E ChartModal은 lightweight-charts v5.2로 line chart + 최신 RSI/MACD 텍스트 + ESC 닫기 + 면책 문구. HoldingsList의 "차트" 버튼으로 호출. **cron schedule 자동 발화 1건 관측됨** (indicators.yml 5/17 05:06 UTC, 지연 3.5h — best-effort 한계 안에서 동작은 확인). 다음 분기점: Stage 3(뉴스) 또는 Stage 2.5(강세장 정점 신호).
 
 | 영역 | 상태 | 비고 |
 |---|---|---|
@@ -18,8 +18,8 @@
 | Stage 2-A 캔들 모델 | ✓ | `candles` 테이블, RLS 2정책, UNIQUE(symbol,timeframe,open_time) |
 | Stage 2-B 캔들 폴러 | ✓ | CoinGecko `/coins/{id}/market_chart?interval=daily`, close+volume, open/high/low=close. 9건 적재 확인 |
 | Stage 2-C 공포·탐욕 | ✓ | Alternative.me 무료, value=31 Fear 적재. AppShell 헤더 위젯 (분류별 색상) |
-| Stage 2-D 지표 | 코드 ✓ / 검증 보류 | RSI 14, MACD 12/26/9, pandas. **Supabase 0004 실행 사용자 액션 대기** |
-| Stage 2-E 차트 UI | 진행 중 | lightweight-charts, 모달 방식 예정 |
+| Stage 2-D 지표 | ✓ | RSI 14·MACD 12/26/9 pandas. 279행 적재 (BTC RSI 35.80, ETH 23.84, SOL 41.86). candle 90일 백필 옵션 추가 |
+| Stage 2-E 차트 UI | ✓ | lightweight-charts v5.2 모달, line chart + 최신 RSI/MACD 텍스트, ESC 닫기, 면책 문구. HoldingsList "차트" 버튼 |
 
 ---
 

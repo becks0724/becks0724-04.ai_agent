@@ -99,16 +99,16 @@
 - [x] workflow_dispatch 첫 실행 성공 — value=31, classification='Fear', captured_at=2026-05-16 (run 25969876326, 21s)
 - [x] 프론트 — `frontend/src/lib/fearGreed.ts` + AppShell 헤더 위젯 (분류별 색상, hover 시 기준일 툴팁). 빌드 408.66KB / gzip 115.96KB
 
-### 2-D. RSI/MACD 계산 ★ 검증 보류
+### 2-D. RSI/MACD 계산 ✓ 완료 (2026-05-18)
 - [x] 계산 정책 — **사전 계산 후 indicators 테이블 저장** (일봉 빈도 낮음, view보다 단순)
 - [x] `worker/migrations/0004_indicators.sql` — indicators 테이블 (rsi_14, macd, macd_signal, macd_hist), UNIQUE, RLS 2정책
 - [x] `worker/indicators.py` — pandas로 RSI 14 / MACD 12,26,9, UPSERT
 - [x] `.github/workflows/indicators.yml` — 매일 01:30 UTC (candle-poll 직후)
 - [x] requirements.txt에 pandas 추가
-- [x] commit `115a859` 푸시
-- [ ] **사용자 액션 — Supabase SQL Editor에서 `0004_indicators.sql` 실행** (보류)
-- [ ] 사용자 SQL 실행 후 workflow_dispatch 자동 진행 + 결과 검증 (자동)
-- 비고: 현재 캔들 3행만 적재된 상태 → RSI 14·MACD 26+9는 데이터 부족으로 초기 NaN. 매일 누적되면서 의미 있는 값 도달.
+- [x] Supabase 0004 SQL 실행 + indicators workflow_dispatch 검증
+- [x] **candle-poll에 `days` workflow input 추가** + 90일 백필 (`gh workflow run candle-poll.yml -f days=90` → 273행 적재)
+- [x] indicators 재트리거 검증 — BTC RSI 35.80 / ETH 23.84 / SOL 41.86 (의미있는 값), MACD 정상. 총 279행 indicators 적재
+- [x] indicators 워커 에러 메시지 상세화 (PostgrestAPIError code/message/details/hint 분리)
 
 ### 2-E. 프론트 차트 + 지표 UI ★ 진행 중
 - [x] 차트 라이브러리 선택 — **lightweight-charts** (TradingView, 캔들/라인/지표 모두 지원)
