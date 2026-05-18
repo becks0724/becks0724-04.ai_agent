@@ -3,7 +3,7 @@
 #
 # 환경변수
 #   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
-#   POLL_SYMBOLS         — "BTC,ETH,SOL" 형식. 매핑은 candle_poller와 동일.
+#   POLL_SYMBOLS         — "BTC,ETH,SOL" 형식. 비어있으면 portfolio_holdings 기반 동적 모드.
 #   POLL_ONCE            — "1"이면 1회만 실행 후 종료.
 #   POLL_INTERVAL_SECONDS — 무한 루프 시 간격 (기본 86400).
 #   CANDLE_LOOKBACK      — 한 번에 로드할 캔들 수 (기본 200, MACD 26+9 + 여유분).
@@ -22,6 +22,8 @@ from datetime import datetime, timezone
 import pandas as pd
 from dotenv import load_dotenv
 from supabase import Client, create_client
+
+from symbol_resolver import fetch_active_symbols
 
 TIMEFRAME = "1d"
 RSI_PERIOD = 14
@@ -134,13 +136,23 @@ def run() -> int:
         print("[indicators] FATAL SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY missing", flush=True)
         return 1
 
-    raw_symbols = os.getenv("POLL_SYMBOLS", "BTC,ETH,SOL")
-    symbols = [s.strip() for s in raw_symbols.split(",") if s.strip()]
+    raw_symbols = os.getenv("POLL_SYMBOLS", "").strip()
     lookback = int(os.getenv("CANDLE_LOOKBACK", "200"))
     interval = int(os.getenv("POLL_INTERVAL_SECONDS", str(24 * 3600)))
     once = os.getenv("POLL_ONCE", "").strip() == "1"
 
     supabase: Client = create_client(url, key)
+
+    if raw_symbols:
+        symbols = [s.strip().upper() for s in raw_symbols.split(",") if s.strip()]
+        print(f"[indicators] mode=env symbols={symbols}", flush=True)
+    else:
+        symbols = fetch_active_symbols(supabase)
+        print(f"[indicators] mode=dynamic active_symbols={symbols}", flush=True)
+
+    if not symbols:
+        print("[indicators] no symbols to process, exit", flush=True)
+        return 0
 
     signal.signal(signal.SIGINT, _request_shutdown)
     signal.signal(signal.SIGTERM, _request_shutdown)
