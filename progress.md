@@ -4,17 +4,57 @@
 
 ---
 
-## 현재 상태 (2026-05-18 KST 세션 마감, 본 세션 누적 commit 18건 `8f46eae`→`3803a27`)
+## 현재 상태 (2026-05-18 후속 세션 마감 #2, **본 세션 누적 변경 파일 다수, 커밋 0건 — push 보류 결정 위임**)
 
-**한 줄 요약** — Stage 3 검증·Stage 2.6 catalog·Stage 4 LLM 분류 코드 완료. 분류는 Gemini 무료 RPD 20 한도로 cron이 약 4일 자동 백필.
+**한 줄 요약** — Coinbase 디자인 + NewsFeed 캐러셀/번역 + ChartModal 3단 multi-pane + **Stage 2.5 14개 지표 적재(13 ok + 1 사용자 액션 대기)** 완료. peak-signals.yml은 여전히 push 전이라 cron 미발화 — push 시 자동 매일 02:30 UTC 발화.
 
-**본 세션 산출 6대 묶음**
-1. **Stage 3 적재 검증** — RSS 4 sources(CoinDesk/Cointelegraph/Bitcoin Magazine/Decrypt) × news-poll workflow → 102 entries / 69 ticker_links 1회 적재 완료.
-2. **Stage 2.6 coins_catalog 5000위 + 워커 동적 심볼 모드** — `coins_catalog` 테이블(0006 SQL) + 폴러(pass1/2 rate limit 재시도) + `symbol_resolver` + price/candle/indicators 모두 `POLL_SYMBOLS` 비어있으면 portfolio_holdings 기반 동적 매핑. 사용자가 FET 알트 추가 → 4 워크플로 모두 정상 검증.
-3. **HoldingForm datalist 자동완성** — 5000개 코인 ilike 검색, 200ms 디바운스.
-4. **ChartModal line 렌더링 fix** — UTCTimestamp+dedup으로 BusinessDay 키 중복 회피, MACD 가변 정밀도 표시.
-5. **Stage 4 LLM 분류 코드 완료** — Anthropic 결제 요구 → Google Gemini 2.5 Flash-Lite 전환. thinking_budget=0 + response_mime_type=json + temperature 0.2. 분당/일별 quota 정교 분리(retryDelay 추출, "PerDay"만 fatal). NewsFeed UI에 sentiment 배지(positive 녹/neutral 노/negative 빨) + event 카테고리 태그.
-6. **Stage 4 백필 약 34/102건 적재** — Gemini 무료 RPD 20 한도 안에서 cron 매시간 :15 UTC가 점진 처리. 다양한 분포 확인(positive/neutral/negative × tech/regulation/general/hack/partnership/listing).
+**본 세션 산출 묶음**
+
+1. **Coinbase 디자인 전면 적용** — `npx getdesign@latest add coinbase` 사양서 + Inter/JetBrains Mono + 흰 캔버스 + 단일 voltage Coinbase Blue + pill 100px + xl 24px. 6개 컴포넌트 전면 리스킨.
+
+2. **NewsFeed 3단계 진화** — 단일 리스트 → 섹션 그룹화 → **카드 캐러셀**(chip 점프 + ←/→ 순환 + N/M) → **MyMemory 무료 번역 + localStorage 캐싱**. `lib/news.ts`에 `symbols: string[]` 임베딩 추가.
+
+3. **2-E ChartModal multi-pane** — v5 `paneIndex` API로 단일 chart 세로 3단 동기 차트(가격 / RSI 14 + 30·70 reference / MACD line+Signal+Histogram + 0 reference). 모달 520×960px.
+
+4. **Stage 2.5 인프라 + 1차 3 지표** — `peak_signals` 테이블(0008 SQL) + `peak_signals_poller.py` + `peak-signals.yml` cron 02:30 UTC + `lib/peakSignals.ts` + `PeakSignals.tsx`(명중·평균 진행률 헤더, 진행률 막대, status 배지, 면책). AppShell 통합. BTC 캔들 365일 백필(371행) — Pi Cycle 350d 충족.
+
+5. **Stage 2.5-B1 자체계산 4 지표 추가** — `btc_rsi_22`(threshold 70), `ahr999`(threshold 1.2, days-from-genesis 회귀), `rainbow_band`(0-7, threshold ≥6, AHR999와 동일 회귀 baseline), `two_year_ma_multiple`(threshold 5, 730d 필요 → 현재 372d로 `insufficient_data` 적재).
+
+6. **Stage 2.5-D 무료 온체인 4 지표** — bitcoin-data.com 무료 API(키 불필요): `puell_multiple`(threshold 4.0), `mvrv_z_score`(threshold 7.0), `nupl`(threshold 0.75), `mvrv_ratio`(threshold 3.7). `fetch_bitcoin_data()` + `compute_onchain_indicator()` 공통화로 4개 람다 일괄 추가.
+
+7. **Stage 2.5-C 합법 무료 2 지표 (MSTR)** — 처음엔 SEC EDGAR 8-K 직접 파싱을 시도했으나 매주 8-K가 BTC 매입이 아니라 컨버터블 노트 환매 등이 섞여 정형 파싱 안정성 낮음 → CoinGecko `/companies/public_treasury/bitcoin` 무료 endpoint로 전환. `mstr_btc_holdings`(정보성, 818,869 BTC), `mstr_pnl_ratio`(threshold 2.0, 50.77%). `unit='BTC'` 타입 확장.
+
+8. **Stage 2.5-B0 CMC 1 지표 (사용자 키 대기)** — `compute_altcoin_season_index()` 신규. CMC docs WebFetch 실패로 endpoint 정확성 검증 못함 → 추정 path `/v1/altcoin-season-index/latest` + 응답 구조 다중 키 fallback(`value` / `altcoin_season_index` / `index`). `CMC_API_KEY` env 없으면 `status=insufficient_data` note='사용자 액션 대기'. endpoint 오류 시 status=error + path/응답 키 목록을 note에 노출해 사용자 보정 가능.
+
+9. **운영 안정화** — bitcoin-data.com 분당 한도 사고(8-11번 지표가 status=error로 ok 행 덮어쓰기)를 두 단계로 견고화:
+   - **upsert 가드** — `status='error'` 행이 같은 captured_at에 `ok` 행이 이미 있으면 적재 안 함 (transient 429가 성공값을 덮어쓰는 사고 차단).
+   - **bitcoin-data.com 429 첫 retry 60초 fixed sleep** — 백오프 `2/4/8s` → `60s/16s/64s`. 분당 한도가 60초면 풀리는 정형 패턴에 맞춤. 호출 사이 0.5s spacing 유지.
+
+10. **CoinGlass Hobbyist tier — 사용자 결정 보류** — 검토 후 보류. `.env.example`에 `COINGLASS_API_KEY=` placeholder + `peak-signals.yml`에 secret 주입만 인프라 준비. 코드는 키 발급·결정 시 진행.
+
+**진단 사례 (코드 변경 없음)**
+- 사용자가 AVAX/LINK/INJ/GRIFFAIN/WLD/AAVE 신규 보유 추가 → 시세 미반영. catalog 매핑 진단 결과 10종 모두 정상. **원인은 단순 price-poll cron(15분) 발화 대기**. `gh workflow run price-poll.yml` 트리거로 03:31:59 UTC에 10종 일괄 적재 → 해결.
+
+**로컬 검증 결과 (Stage 2.5, 14행 적재 완료)**
+
+| # | 지표 | 출처 | 값 | hit | 진행률 |
+|---|---|---|---|---|---|
+| 1 | btc_dominance | coingecko | 58.22% | ❌ | 83.17% |
+| 2 | mayer_multiple | computed | 0.9551 | ❌ | 39.79% |
+| 3 | pi_cycle_top | computed | 0.3835 | ❌ | 38.35% |
+| 4 | btc_rsi_22 | computed | 44.41 | ❌ | 63.44% |
+| 5 | ahr999 | computed | 0.4720 | ❌ | 39.33% |
+| 6 | rainbow_band | computed | 2 / 7 | ❌ | 33.33% |
+| 7 | two_year_ma_multiple | computed | — | — | insufficient (372/730d) |
+| 8 | puell_multiple | bitcoin-data | 0.7923 | ❌ | 19.81% |
+| 9 | mvrv_z_score | bitcoin-data | 0.8177 | ❌ | 11.68% |
+| 10 | nupl | bitcoin-data | 0.3087 | ❌ | 41.16% |
+| 11 | mvrv_ratio | bitcoin-data | 1.4465 | ❌ | 39.09% |
+| 12 | mstr_btc_holdings | coingecko | 818,869 BTC | — | — |
+| 13 | mstr_pnl_ratio | coingecko | 1.0153 | ❌ | 50.77% |
+| 14 | altcoin_season_index | cmc | — | — | insufficient (CMC_API_KEY 대기) |
+
+전 지표가 정점 임계에서 멀다. BTC 약세장(~76k) 흐름 일관. **Stage 2.5 진행률 14 / ~23 = 60.9%** (Coinglass 30개 카탈로그 중 무료 가용 18-23개 기준).
 
 | 영역 | 상태 | 비고 |
 |---|---|---|
@@ -30,7 +70,11 @@
 | HoldingForm 자동완성 | ✓ | datalist + 200ms 디바운스 검색 (symbol/name ilike, rank 정렬 상위 30) |
 | FET 검증 사례 | ✓ | 사용자가 FET 보유 추가 → price 4건/candle 91×4=364행/indicators 374행(RSI 42.575/MACD -0.0048). 동적 매핑 모든 단계 통과 |
 | Stage 4 LLM 분류 (코드) | ✓ | 0007 SQL + news_classifier(Gemini 2.5 Flash-Lite, thinking_budget=0, response_mime_type=json) + news-classify.yml(매시간 :15 UTC) + NewsFeed 배지(positive/neutral/negative)·태그(상장/규제/해킹/파트너십/기술/일반) |
-| Stage 4 LLM 분류 (적재) | 진행 중 | 본 세션 약 34건 적재(다양한 sentiment·category 분포 확인). Gemini 무료 RPD 20건 한도로 cron이 매일 ~20건씩 약 4일에 걸쳐 102건 완료 예정 |
+| Stage 4 LLM 분류 (적재) | 진행 중 | 약 34건 적재(다양한 sentiment·category 분포 확인). Gemini 무료 RPD 20건 한도로 cron이 매일 ~20건씩 약 4일에 걸쳐 102건 완료 예정 |
+| Coinbase 디자인 | ✓ | `frontend/DESIGN.md`(getdesign 토큰 사양서) + Inter/JetBrains Mono + 흰 캔버스 + Coinbase Blue 단일 voltage + pill 100px + xl 24px. 6개 컴포넌트 전면 리스킨 |
+| NewsFeed 카드 캐러셀 + 번역 | ✓ | 섹션 chip 점프 + ←/→ 순환 + MyMemory 무료 번역(localStorage 영구 캐시) + symbols 임베딩 |
+| ChartModal multi-pane | ✓ | v5 `paneIndex` API로 가격/RSI(30·70 reference)/MACD(line+Signal+Histogram, 0 reference) 세로 3단 동기 차트 |
+| Stage 2.5 1차 (3 지표) | 진행 중 | 0008 SQL 실행 완료 + 워커 로컬 1회 실행 3행 적재. **push 전이라 peak-signals cron 미발화** — push 시 매일 02:30 UTC 자동 발화 |
 
 ---
 
@@ -127,30 +171,58 @@ session prop이 `App → AppShell`로, userId prop이 `AppShell → HoldingForm`
 
 ## 다음 할 일 (다음 세션 시작 시)
 
-### 자동 진행 (사용자 액션 없음, 그저 대기)
-- `news-classify.yml` cron 매시간 :15 UTC × Gemini RPD 20건 → 약 4일 뒤 102건 백필 완료. 그 후 신규 RSS(news-poll :05) 뉴스도 자동 분류.
-- 다른 모든 cron 워크플로 정상 (price-poll 15분, fear-greed 01:00, candle-poll 01:15, indicators 01:30, news-poll :05, coins-catalog 02:00).
+### 사용자 결정 대기 (가장 우선)
+- **누적 변경 push 결정** — Stage 2.5 1차 + B1 + D + C(MSTR) + B0 skeleton + 운영 안정화 + Coinbase 디자인 + NewsFeed 캐러셀 등. 분할 권장 4-5 commit:
+  1. `feat(frontend): Coinbase 디자인 적용 (DESIGN.md + 전체 리스킨)`
+  2. `feat(news): 카드 캐러셀 + 섹션 분류 + 한글 번역 + symbols 임베딩`
+  3. `feat(stage2.5): peak_signals 인프라 + 13 지표(자체계산 7 + bitcoin-data 4 + MSTR 2)`
+  4. `feat(stage2.5-b0): CMC altcoin_season_index skeleton (CMC_API_KEY 대기)`
+  5. `fix(peak): bitcoin-data 60s first-retry + upsert error 가드`
 
-### 시각 검증 (사용자 브라우저)
-- prod URL [crypto-monitoring-one.vercel.app](https://crypto-monitoring-one.vercel.app)
-- **HoldingForm** — 심볼 입력 시 datalist 자동완성 (예: `bitc` → Bitcoin #1)
-- **ChartModal FET line** — `5383e69` 배포 후 line 표시 + RSI/MACD 가변 정밀도
-- **NewsFeed 배지/태그** — sentiment 배지(positive 녹/neutral 노/negative 빨) + category 태그(상장/규제/해킹/파트너십/기술/일반). 분류 안 된 신규 뉴스는 배지 없이 표시.
+### CMC key 발급 후 사용자 알림 (2.5-B0 활성화)
+- 사용자가 CMC Basic 무료 plan 키 발급 + `worker/.env`에 `CMC_API_KEY=<값>` 저장 + `gh secret set CMC_API_KEY` 후 신호 시:
+  - 로컬 1회 dry-run으로 `altcoin_season_index` 행을 status=ok/error 중 어느 쪽으로 적재되는지 확인
+  - status=error면 note의 path 또는 응답 키 목록을 보고 endpoint 또는 응답 키 보정 (이미 코드가 디버깅 정보 노출 준비됨)
+
+### CoinGlass Hobbyist 결정 (보류 상태)
+- 도입 결정 시 — Hobbyist $29/월 결제 + 키 발급 + ETF flow endpoint 확인 + `compute_etf_flow()` 통합
+- 영구 보류 시 — `.env.example`의 `COINGLASS_API_KEY` placeholder 삭제 + workflow yml secret 주입 제거
+
+### push 후 즉시 수행
+- `gh workflow run peak-signals.yml` 트리거 → GitHub Actions에서 14행 첫 적재 확인 (로컬과 일치할 것)
+- Vercel 자동 배포 → prod URL [crypto-monitoring-one.vercel.app](https://crypto-monitoring-one.vercel.app)에서 시각 검증
+
+### 자동 진행 (push 후, 사용자 액션 없음)
+- `peak-signals.yml` cron 매일 02:30 UTC 자동 발화 (14 지표 일별 적재. CMC key 미발급이면 `altcoin_season_index`는 계속 insufficient_data)
+- `candle-poll.yml` 매일 누적 → `two_year_ma_multiple`이 730일 누적 시 자동 활성화 (현재 372d → 약 358일 후)
+- `news-classify.yml` cron 매시간 :15 UTC × Gemini RPD 20건 → 102건 점진 백필
+- 다른 cron 워크플로 정상 (price-poll 15분, fear-greed 01:00, candle-poll 01:15, indicators 01:30, news-poll :05, coins-catalog 02:00, news-classify :15)
+
+### 시각 검증 (사용자 브라우저, push + Vercel 배포 후)
+- **Coinbase 디자인 전면** — 흰 캔버스 + Coinbase Blue + pill CTA 일색
+- **PeakSignals 표 14행** — 명중 0/12 + insufficient 2(2y MA, Altcoin Season) + 평균 진행률 ~42%
+- **HoldingForm** — datalist 자동완성
+- **ChartModal multi-pane** — 가격/RSI/MACD 세로 3단 동기 차트
+- **NewsFeed 카드 캐러셀** — 필터/그룹 + 섹션 chip + ←/→ + 한글 번역
 - 검증 쿼리(SQL Editor):
   ```sql
+  -- peak_signals 14행 확인
+  select signal_key, value, threshold, hit, progress_pct, status, note, captured_at
+    from peak_signals order by captured_at desc, signal_key;
+  -- 분류 분포
   select sentiment, count(*) from news_classifications group by sentiment order by 2 desc;
   select event_category, count(*) from news_classifications group by event_category order by 2 desc;
-  select source, count(*) from news group by source order by 2 desc;
   ```
 
 ### 본 작업 분기점 (사용자 선택)
-- **Stage 2.5 — 강세장 정점 신호 (CMC key 필요)** — peak_signals 테이블 + CMC Altcoin Season Index 어댑터 + CoinGecko 자체 계산 18-23개. 사용자 액션 — CMC Pro Basic API key 발급(무료, 10k credits/월).
-- **Stage 5 — 실시간화** — WebSocket, Fly.io 등 long-running 호스팅으로 이전 검토 (현재 GitHub Actions cron은 30초 폴링 불가).
+- **Stage 2.5 추가 확장** — Bull Market Support Band(20wSMA + 21wEMA), CMC `/v1/global-metrics/quotes/latest`(ETH 도미넌스 등 보조), Coinbase Premium index 등
+- **Stage 5 — 실시간화** — WebSocket + Fly.io 등 long-running 호스팅 이전 (현재 GitHub Actions cron은 30초 폴링 불가)
+- **Stage 4 paid tier** — Gemini paid는 RPD/RPM 제한 해제 + 비용 극소. 102건 즉시 완료
 
 ### 단기 잔여
-- 빈 `becks0724/crypto-monitoring` 저장소 삭제 결정 (작업 영향 없음)
-- cron schedule 발화 모니터링 — 본 세션 5/17 04-05 UTC 1건씩 관측 후 추가 누적
-- **분류 paid tier 전환 검토 (선택)** — Gemini paid는 RPD/RPM 제한 해제 + 비용 극소. 사용자 결정.
+- 빈 `becks0724/crypto-monitoring` 저장소 삭제 결정
+- cron schedule 발화 모니터링 — push 후 peak-signals 02:30 UTC 자동 발화 관측
+- IDE Python interpreter 설정 (`.vscode/settings.json`에 `python.defaultInterpreterPath: worker/.venv/bin/python3.11`) — false positive diagnostics 해소 (선택)
 
 ### 잔여 — cron schedule 발화
 - price-poll.yml `*/15` 실제 발화 간격은 ~1시간 (자동 발화는 되나 빈도가 cron보다 낮음)
@@ -166,6 +238,30 @@ session prop이 `App → AppShell`로, userId prop이 `AppShell → HoldingForm`
 ---
 
 ## 의사결정 로그
+
+### 2026-05-18 후속 #2 (Stage 2.5 확장 — 13 추가 지표 + B0 skeleton + 운영 안정화)
+- **2.5-B1 5개 자체계산 우선 진행** — Why: 사용자 액션(키 발급) 없이 즉시 추가 가능. BTC 캔들이 이미 372d 있어 RSI 22 / AHR999(200d 기하평균 + 회귀가격) / Rainbow Band(log 회귀, AHR999와 동일 baseline) 즉시 계산. 2y MA Multiple(730d 필요)은 skeleton만 활성화하고 candle-poll 누적으로 자연 활성화 대기.
+- **Rainbow Band 회귀식 보정** — Why: 초기 Bitcoin Magazine blocks 기반 회귀(`2.66 × log10(blocks) - 17.92`)에 days를 넣어 baseline이 1e-8 USD로 비현실 → band_idx clamp 7로 잘못된 명중. AHR999와 동일한 days-from-genesis 회귀(`5.84 × log10(age_days) - 17.01`)로 통일 → baseline ~158k(예측가) → band 2(Accumulate) 안정.
+- **2.5-D 4개 온체인 — bitcoin-data.com 무료 채택** — Why: 키 불필요 + REST endpoint 명확(`/api/v1/{key}/last`) + 응답 정형. WebFetch가 docs 못 잡았지만 직접 curl probe로 4개 endpoint(`puell-multiple`/`mvrv-zscore`/`nupl`/`mvrv`) 모두 200 검증. 응답 구조 동일해 `compute_onchain_indicator()` 1 함수로 4개 일괄 처리.
+- **2.5-C MSTR — SEC EDGAR → CoinGecko로 전환** — Why: 처음엔 SEC EDGAR 8-K 직접 파싱을 시도했으나 실제 8-K 본문이 BTC 매입이 아닌 컨버터블 노트 환매 / 기타 이벤트와 섞여 정형 파싱 신뢰성 낮음. CoinGecko `/companies/public_treasury/bitcoin`이 Strategy 포함 상장사 BTC 보유 데이터(`total_holdings`, `total_entry_value_usd`, `total_current_value_usd`, `percentage_of_total_supply`)를 정형 응답으로 직접 제공 — 키 불필요, 8-K 파싱을 CoinGecko가 대신 해주는 효과. 사용자 의도(MSTR 보유량) 100% 충족.
+- **MSTR 평균 매입가 ratio threshold 2.0** — Why: 2021/2024 사이클 top에서 MSTR PnL ratio ~2.4-2.5 관측. 2.0이 명중 임계. 현재 1.0153(BTC 76k, MSTR 평균 매입가 ~75.5k)로 진행률 50.77%.
+- **Strategy rebrand 대응** — Why: MicroStrategy가 2025년 Strategy로 사명 변경. `_find_strategy()` 헬퍼에서 name이 `Strategy` 또는 `MicroStrategy`인 항목 모두 매칭하도록 처리. CIK 0001050446은 동일.
+- **ETF flow — CoinGlass Hobbyist 보류** — Why: CoinGlass docs WebFetch 불가능, 일반적으로 ETF endpoint는 Hobbyist tier($29/월) 이상으로 알려짐. 무료 합법 대안 부재(SosoValue/Farside는 비공식 스크랩, SEC 13F-HR은 분기 단위, Polygon.io free는 가격만). 사용자 결정 — 보류. 인프라(.env.example + workflow secret 주입)만 준비.
+- **2.5-B0 CMC Altcoin Season Index — skeleton 우선 적재** — Why: CMC docs WebFetch도 정확한 endpoint path 못 알려줘 `/v1/altcoin-season-index/latest`로 추정. 사용자 키 발급 후 첫 호출 결과로 status=ok/error를 보고 보정 가능하도록 코드가 도와줌(error 시 note에 path + 응답 키 목록 노출). 키 없으면 `insufficient_data` note='CMC_API_KEY missing — 사용자 액션 대기'로 행 적재 → UI에 무엇을 기다리는지 명시.
+- **운영 안정화 1 — upsert 가드** — Why: bitcoin-data.com 분당 한도 사고로 8-11번 지표가 status=error로 적재됐는데, 그게 같은 captured_at의 이전 ok 행을 덮어써서 사용자 화면에 "오류" 표시. upsert 가드 — `status='error'`는 같은 captured_at에 ok 행이 이미 있으면 skip. 한 번이라도 ok 적재되면 transient 429 발생 시에도 표시 유지.
+- **운영 안정화 2 — bitcoin-data.com 429 첫 retry 60초 fixed sleep** — Why: 백오프 `2/4/8s`로는 분당 한도(60초 cooldown 정형)가 못 풀려 4 endpoint 모두 실패. `60s/16s/64s`로 첫 retry에 분당 한도 리셋 보장. 호출 사이 0.5s spacing 유지. cron 일 1회 환경에선 발생 안 하나, 로컬 다중 실행 + 다음 cron 발화 안전 보장.
+- **IDE Python interpreter mismatch false positive** — Why: IDE가 시스템 Python 3.9를 가리켜 `httpx`, `dotenv`, `supabase`를 못 찾는다고 표시. 워커는 `worker/.venv` Python 3.11에서 실행되므로 무관. 향후 `.vscode/settings.json`에 `python.defaultInterpreterPath`로 명시 가능(선택).
+
+### 2026-05-18 후속 (Coinbase 디자인 + 카드 캐러셀 + 번역 + ChartModal 3단 + Stage 2.5 1차)
+- **Coinbase 디자인 채택 — `getdesign add coinbase` 사양서 기반** — Why: 사용자가 명시적으로 Coinbase 스타일 요구. `npx getdesign@latest add coinbase` CLI가 무료로 토큰 사양서(YAML frontmatter + 컴포넌트 명세)를 `frontend/DESIGN.md`로 생성. Inter / JetBrains Mono를 CoinbaseDisplay/Sans / CoinbaseMono의 공식 대체 폰트로 채택(라이선스 없는 안전 선택). 흰 캔버스 + 단일 voltage Coinbase Blue + pill 100px geometry로 통일 — 다크 톤 흔적 일소.
+- **NewsFeed 카드 캐러셀로 재설계** — Why: 사용자 명시 — "한 번에 모든 뉴스 보기보다 한 건씩 넘겨서 보기 + 기존 카테고리 분류 유지". 섹션 chip(라벨+카운트)으로 카테고리 점프 + 현재 섹션 내 ←/→ 순환(wrap). 단일 섹션(시간순)이면 chip 자동 숨김. 32px padding 큰 회색 카드(`#f7f7f7` 16px radius)에 24px 헤드라인 표시 — 가독성·집중도 향상.
+- **뉴스 번역 — MyMemory 무료 API + localStorage 캐싱** — Why: 사용자가 영문 뉴스 한글화 요구. 워커에서 LLM 번역 추가하면 Gemini RPD 20 한도와 충돌. MyMemory는 키 불필요·CORS 허용·IP당 일 5천 단어 한도. localStorage에 영구 캐시(동일 헤드라인은 1회만 호출). 현재 카드 + 인접 4건 prefetch — 사용자 ←/→ 누르기 전에 미리 준비. 번역 실패(원문 echo) 시 캐시 안 함. 영문 원본은 작은 회색 이탤릭으로 함께 노출(검증 가능성 확보).
+- **ChartModal multi-pane — v5 `paneIndex` API** — Why: checklist 2-E "RSI/MACD 보조 패널" 항목이 단순 최신값 Stat 카드로만 충족된 상태였음. 정통 TradingView 패턴은 가격 + RSI + MACD 세로 적층. lightweight-charts v5는 `addSeries(LineSeries, opts, paneIndex)` 인자로 단일 chart에서 multi-pane 지원 → 별도 인스턴스 없이 x축 자동 동기화. `createPriceLine`으로 RSI 30·70 / MACD 0 reference 점선 추가. Histogram은 hist 부호에 따라 컬러 분기(±).
+- **Stage 2.5 우선순위 — 키 불필요 3 지표부터** — Why: 사용자 액션(CMC Pro key 발급)을 기다리지 않고 즉시 진행 가능한 영역부터. CoinGecko `/global`로 BTC 도미넌스(키 불필요) + BTC candles로 Mayer Multiple(200dMA)·Pi Cycle Top(350dMA × 2) 자체 계산. 추가 외부 의존성 0. 1차 구현으로 인프라(peak_signals 테이블 + 워커 골격 + 프론트 표) 검증.
+- **peak_signals 스키마 — status 컬럼으로 데이터 부족 추적** — Why: Pi Cycle은 350일 candle 누적이 필수인데, candle-poll이 cron 시작 후 며칠 동안은 미충족. `status='insufficient_data'` 값으로 행을 적재해 (1) "왜 비어있나" 디버깅 가능 (2) 프론트에서 "데이터 누적 중" 안내 표시 가능 (3) hit/progress null로 평균 계산에서 자연 제외. 단순 skip보다 운영 가시성 우월.
+- **BTC 캔들 365일 백필 (`-f days=365`)** — Why: 기존 candle-poll은 일별 days=2(어제·오늘)만 적재. Pi Cycle 350일 SMA에는 95+ days 부족. workflow_dispatch days input으로 1회 365일 백필 → 371행 적재로 충당. 2년/4년 MA(2.5-B1)는 별도 외부 데이터 필요(CoinGecko 무료 plan 365일 한도).
+- **AppShell 배치 — 포트폴리오 ↔ peak_signals ↔ 뉴스** — Why: 사용자 의사결정 흐름이 자기 포지션 → 거시 신호 → 시장 뉴스 순서. Coinbase 마케팅 페이지의 editorial rhythm과도 일치.
+- **AVAX 등 신규 심볼 미반영 진단** — Why: 사용자가 6종 추가 후 즉시 표시 안 됨 → catalog 진단 결과 매핑 모두 정상. 단순 cron 발화 대기. 코드 변경 없이 `gh workflow run`으로 해결. **교훈** — 보유 추가 직후 ~15분간 시세 미보유는 정상 동작이며 SummaryBox 경고 문구로 이미 안내 중. UX 차후 개선 — "지금 새로고침" 사용자 액션 버튼 검토.
 
 ### 2026-05-18 (Stage 4 LLM 분류 — Gemini 무료 tier)
 - **Anthropic → Gemini 전환** — Why: Anthropic API는 무료 크레딧 없이 결제 등록 필수. 사용자 무료 옵션 요구로 Google AI Studio Gemini 무료 tier 채택. 본 워커 규모(매시간 ~10건)는 무료 한도 안.

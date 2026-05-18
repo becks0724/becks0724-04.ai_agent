@@ -110,19 +110,26 @@
 - [x] indicators 재트리거 검증 — BTC RSI 35.80 / ETH 23.84 / SOL 41.86 (의미있는 값), MACD 정상. 총 279행 indicators 적재
 - [x] indicators 워커 에러 메시지 상세화 (PostgrestAPIError code/message/details/hint 분리)
 
-### 2-E. 프론트 차트 + 지표 UI ★ 진행 중
-- [x] 차트 라이브러리 선택 — **lightweight-charts** (TradingView, 캔들/라인/지표 모두 지원)
-- [ ] `frontend/src/lib/candles.ts` — Supabase 조회 헬퍼
-- [ ] `frontend/src/lib/indicatorsApi.ts` — RSI/MACD 조회 헬퍼
-- [ ] `CandleChart` 컴포넌트 — line chart (캔들은 OHLC=close라 단순화)
-- [ ] RSI / MACD 보조 패널
-- [ ] HoldingsList의 각 행에 "차트" 버튼 → 모달로 표시
-- [ ] "통계 표시 전용, 매매 신호 아님" 면책 문구
+### 2-E. 프론트 차트 + 지표 UI ✓ 완료 (2026-05-18)
+- [x] 차트 라이브러리 선택 — **lightweight-charts v5.2** (TradingView, 캔들/라인/지표 모두 지원)
+- [x] `frontend/src/lib/candles.ts` — Supabase 조회 헬퍼 (open_time 오름차순, 200건 한도)
+- [x] `frontend/src/lib/indicatorsApi.ts` — RSI/MACD 조회 헬퍼
+- [x] `ChartModal` 컴포넌트 — line chart (캔들은 OHLC=close라 단순화)
+- [x] RSI / MACD 보조 패널 — **v5 `paneIndex` multi-pane API로 세로 3단 동기화 차트**. pane 0 가격 / pane 1 RSI(30·70 reference) / pane 2 MACD line + Signal line + Histogram(±컬러). 최신값 5개 Stat 카드 + 레전드 dot
+- [x] HoldingsList의 각 행에 "차트" 버튼 → 모달로 표시 (ESC 닫기 + backdrop click 닫기)
+- [x] "통계 표시 전용, 매매 신호 아님" 면책 문구
 
 ---
 
-## Stage 2.5 · 강세장 정점 신호 (Bull Market Peak Signals) — 백로그
+## Stage 2.5 · 강세장 정점 신호 (Bull Market Peak Signals) ★ 진행 중
 
+> **진행률 — 14 / ~23 = 60.9%** (2026-05-18 후속 #2 기준. Coinglass 30개 카탈로그 중 무료 가용 18-23개 기준)
+>
+> 적재 상태 (push 후 cron 매일 02:30 UTC):
+> - **status=ok** 12개 — 자체계산 5(Mayer/Pi Cycle/RSI22/AHR999/Rainbow) + 도미넌스(CoinGecko) + 온체인 4(Puell/MVRV-Z/NUPL/MVRV via bitcoin-data.com) + MSTR 2(CoinGecko treasury)
+> - **status=insufficient_data** 2개 — `two_year_ma_multiple`(730d 필요, 현재 372d) / `altcoin_season_index`(CMC_API_KEY 사용자 액션 대기)
+> - **보류** — ETF flow(CoinGlass Hobbyist $29/월 결정 보류) / Bull Market Support Band(정점 신호 부적합)
+>
 > 참고 페이지
 > - Coinglass `bull-market-peak-signals` (30개 카탈로그) — https://www.coinglass.com/bull-market-peak-signals
 > - CoinMarketCap `crypto-market-cycle-indicators` — https://coinmarketcap.com/ko/charts/crypto-market-cycle-indicators/ (Pi Cycle / Puell / Rainbow 등 핵심 지표)
@@ -136,17 +143,55 @@
 > 구현 시점 — Stage 1·2 완료 후. Stage 1-C 진입 우선.
 > 표시 정책 — CLAUDE.md "가격 예측 기능 없음" 원칙은 유지. 본 지표는 공개 통계의 **표시·이력**이며 매매 신호로 해석시키지 않는다. UI에 면책 문구 필수.
 
-### 2.5-A. 인프라
-- [ ] **사용자 액션** — CoinMarketCap Pro API key 발급 (Basic 무료 plan: 30 req/min, 10,000 credits/월)
-- [ ] `worker/.env`에 `CMC_API_KEY` 추가 + `.env.example` 갱신
-- [ ] `peak_signals` 테이블 설계 (id, signal_key, value_numeric, threshold, hit boolean, captured_at, source enum: 'cmc'/'coingecko'/'computed')
-- [ ] 워커 일일 수집 잡 — 각 지표 1회/일 적재
-- [ ] 프론트 — 지표 표 (현재값/기준값/명중여부/거리/Progress) + 평균 진행률 헤더
+### 사용자 액션 보드 (Stage 2.5 활성 대기)
 
-### 2.5-B0. CMC 공식 API 사용 (출처 우선)
-- [ ] **알트코인 시즌 지수 (Altcoin Season Index)** — `GET /v1/altcoin-season-index/latest` 및 `/historical` (7d/30d/90d). 0-100 스케일, ≥75 알트시즌·≤25 비트코인 시즌. 15분 캐시·1 credit/call.
-- [ ] **공포·탐욕 지수 (Fear & Greed Index)** — `GET /v1/fear-and-greed/latest` (CMC). 대안: alternative.me 무료 API.
-- [ ] **★ CMC 'crypto-market-cycle-indicators' 페이지 지표 API 존재 여부 확인** — Pi Cycle Top / Puell Multiple / Rainbow Chart 등이 CMC API에서 별도 엔드포인트로 제공되는지 미확인. 화면용 위젯뿐일 가능성 ★. 확인 안 되면 아래 2.5-B1 자체 계산으로 폴백.
+| # | 액션 | 효과 | 상태 |
+|---|---|---|---|
+| 1 | CMC Pro Basic key 발급 + worker/.env + GitHub secret | `altcoin_season_index` insufficient_data → ok | 대기 |
+| 2 | (선택) CoinGlass Hobbyist $29/월 결제 + key | ETF flow + 추가 지표 통합 가능 | 보류 결정 |
+| 3 | (자동) candle-poll 매일 누적 ~358일 | `two_year_ma_multiple` insufficient_data → ok 자동 활성화 | 자동 진행 |
+
+### 2.5-A. 인프라 ★ 1차 구현 완료 (2026-05-18, 키 불필요 지표 3종)
+- [ ] **사용자 액션** — CoinMarketCap Pro API key 발급 (Basic 무료 plan: 30 req/min, 10,000 credits/월) — 2.5-B0 진행 시 필요
+- [ ] `worker/.env`에 `CMC_API_KEY` 추가 + `.env.example` 갱신 — CMC key 발급 후
+- [x] `peak_signals` 테이블 설계 — `worker/migrations/0008_peak_signals.sql` (signal_key, value, threshold, hit, progress_pct, source, status, note, captured_at, UNIQUE(signal_key, captured_at), RLS 2정책)
+- [x] **사용자 액션** — Supabase SQL Editor에서 `0008_peak_signals.sql` 실행
+- [x] 워커 일일 수집 잡 — `worker/peak_signals_poller.py` (CoinGecko `/global` + BTC candles 200/350dMA 자체 계산)
+- [x] `.github/workflows/peak-signals.yml` — cron `30 2 * * *` (candle-poll/indicators 이후)
+- [x] **첫 검증 (2026-05-18)** — workflow_dispatch peak-signals 1회 실행 후 3종 적재 확인
+- [x] 프론트 — `frontend/src/lib/peakSignals.ts` + `PeakSignals.tsx` (signal_key별 최신 1행, 명중·평균 진행률 헤더, 진행률 막대, 면책)
+- [x] AppShell 통합 — 포트폴리오 ↔ 뉴스 사이에 PeakSignals 섹션 배치
+- [x] **BTC 캔들 365일 백필** — `gh workflow run candle-poll.yml -f days=365` (Pi Cycle 350d 요구분 충당)
+
+### 2.5-B0. CMC 공식 API 사용 ★ 1차 구현 (2026-05-18 후속, 사용자 키 대기)
+
+> 설계 결정 (2026-05-18 후속)
+> - **endpoint 검증** — CMC docs WebFetch에서 정확한 path 못 추출. 추정 `/v1/altcoin-season-index/latest` 채택. 키 발급 후 사용자 1회 호출로 검증 필요. 잘못된 path면 워커가 status='error' + note에 path 노출 → 보정 가능.
+> - **응답 구조** — `{ status: { error_code, ... }, data: { ... } }` envelope 가정. data 안의 키는 `value` / `altcoin_season_index` / `index` 순으로 시도. 실제 키가 다르면 note에 응답 키 목록 노출 → 보정.
+> - **CMC Fear & Greed skip** — Alternative.me 무료 endpoint가 이미 적재 중. 중복 출처라 도입 가치 낮음.
+> - **Cycle Indicators 페이지 위젯 (Pi Cycle/Puell/Rainbow)** — 별도 API endpoint 존재 확인 안 됨. 2.5-B1·D에서 이미 자체 계산·bitcoin-data.com으로 커버. CMC 별도 통합 불필요.
+
+#### 코드 (사용자 키 없이도 적재 동작)
+- [x] `fetch_cmc(path, params)` 공통 헬퍼 — `X-CMC_PRO_API_KEY` 헤더 + envelope status 검사 + 429/401/403/404 분기 처리
+- [x] `compute_altcoin_season_index(captured_at)` — `CMC_API_KEY` env 없으면 `insufficient_data` note='사용자 액션 대기'. endpoint 호출 실패 시 `error` + note에 path 노출
+- [x] run_once computations에 14번째 람다 추가
+- [x] `lib/peakSignals.ts` SIGNAL_META 추가 + DISPLAY_ORDER 14개로 확장
+- [x] 드라이런 검증 (key 없는 경우) — `altcoin_season_index` row가 `status=insufficient_data`로 정상 적재 확인
+- [x] 빌드 — 610KB / gzip 179.7KB
+
+#### 사용자 액션 (4단계, ETF flow와 동일 패턴)
+- [ ] **① CMC 가입** — https://coinmarketcap.com/api/ "Get Your Free API Key Now" 또는 https://pro.coinmarketcap.com/signup
+- [ ] **② Basic 무료 plan 확인** — 가입 시 자동 Basic ($0). 10k credits/월, 30 req/min.
+- [ ] **③ API key 발급** — https://pro.coinmarketcap.com/account 에서 자동 발급된 키 복사 (Profile → API Keys). 본문 채팅 노출 금지.
+- [ ] **④ 키 저장 (2곳)**:
+  - 로컬: `worker/.env`에 `CMC_API_KEY=<발급값>`
+  - GitHub Actions: `gh secret set CMC_API_KEY` 또는 UI
+
+#### 키 발급 후 검증 (사용자 신호 시)
+- [ ] `POLL_ONCE=1 .venv/bin/python3 peak_signals_poller.py` 로컬 실행 → `altcoin_season_index` 행을 보고:
+  - `status=ok value=<숫자>` → endpoint·응답 키 정확. cron 자동 적재 진행.
+  - `status=error note="404"` → endpoint path 오류. note의 path를 사용자가 docs와 대조 → 보정.
+  - `status=error note="response keys: [...]"` → endpoint OK, value 키 이름 다름. note의 키 목록으로 코드 보정.
 
 ### 2.5-B1. CoinGecko 가격으로 자체 계산 (CMC API에 없을 때 폴백·또는 무료 유지)
 - [ ] **AHR999 지수** — `BTC / 200d_geomean_MA × growth_factor` (대략).
@@ -274,3 +319,131 @@
 - [ ] 프론트 실시간 가격 위젯
 - [ ] 연결 끊김·재연결 처리
 - [ ] 부하 테스트 (다중 사용자 시나리오)
+
+---
+
+## 디자인 시스템 · Coinbase 적용 ✓ 완료 (2026-05-18 후속)
+
+> 설계 결정 (2026-05-18 후속)
+> - **출처** — `npx getdesign@latest add coinbase` CLI가 생성한 `frontend/DESIGN.md` 토큰 사양서. 라이선스 폰트는 Inter / JetBrains Mono로 대체.
+> - **voltage** — Coinbase Blue `#0052ff` 하나만. 모든 primary CTA / 브랜드 wordmark / 강조 링크에만 사용.
+> - **geometry** — pill 100px(액션 버튼·탭·배지) / xl 24px(카드) / full 9999px(아이콘) / md 12px(input). sharp 0px 금지.
+> - **rhythm** — 흰 캔버스 + soft gray(#f7f7f7) 부드러운 표면 + hairline(#dee1e6) 1px 디바이더. 단일 shadow tier.
+> - **trading semantics** — up `#05b169` / down `#cf202f`은 텍스트 컬러로만. 배경 fill 금지.
+
+- [x] `frontend/DESIGN.md` 생성 (getdesign add coinbase) — YAML 토큰 + 컴포넌트 사양 + Do/Don't
+- [x] `frontend/index.html` — Inter + JetBrains Mono Google Fonts preconnect + display=swap
+- [x] `frontend/src/index.css` — 다크 토큰 전부 → Coinbase 토큰(colors / radius / spacing / fontFamily). #root 강제 width 1126px 제거 → 100vh white canvas
+- [x] `Login.tsx` — 420px 화이트 카드 + 36px h1 + Coinbase Blue pill CTA. 다크 보더 일소
+- [x] `AppShell.tsx` — 64px sticky top-nav + 파란 brand wordmark + Fear & Greed pill 배지 + 흰 SummaryBox 24px radius(컬럼 hairline 분리)
+- [x] `HoldingForm.tsx` — 32px padding 흰 카드 + 44px hairline input + 파란 pill "추가" CTA + pill "새로고침"
+- [x] `HoldingsList.tsx` — 흰 카드 + 32px 원형 asset-icon(symbol 첫 글자) + uppercase 컬럼 헤더 + mono 가격 + pill 3종 액션(primary/secondary/outline-danger)
+- [x] `NewsFeed.tsx` — 흰 카드 + segmented control pill 탭(active = ink #0a0b0d) + pill 감성 배지(라이트 톤) + pill 카테고리 태그
+- [x] `ChartModal.tsx` — 흰 모달 24px radius + #0052ff 라인 + #eef0f3 그리드 + asset-icon 헤더 + 5 Stat 카드(#f7f7f7 12px)
+- [x] `App.tsx` — 로딩 상태도 흰 캔버스로 통일
+
+---
+
+## NewsFeed 진화 · 카드 캐러셀 + 한글 번역 ✓ 완료 (2026-05-18 후속)
+
+> 설계 결정 (2026-05-18 후속)
+> - **표시 방식** — 사용자 명시 "한 건씩 넘겨서 보기". 단일 리스트 → 카드 캐러셀.
+> - **그룹화** — 사용자 명시 "기존 카테고리별". 4 그룹(감성/카테고리/종목/시간순) × 2 필터(보유/전체) 분리.
+> - **번역 출처** — MyMemory API(키 불필요, 무료 일 5천 단어). 워커 LLM 분류와 quota 충돌 회피.
+> - **캐싱** — localStorage 영구. 동일 헤드라인은 1회만 호출.
+
+- [x] `lib/news.ts` — `NewsItem.symbols: string[]` 추가 + select에 `news_ticker_map(symbol)` 임베딩
+- [x] `NewsFeed.tsx` 1단계 — 단일 리스트 → 4 그룹 섹션(감성 ●●● + 카테고리 6 + 종목 N + 시간순) 적층
+- [x] `NewsFeed.tsx` 2단계 — 섹션 모두 노출 → 카드 캐러셀(chip 점프 + ←/→ 순환 wrap + N/M 카운터)
+- [x] `lib/translate.ts` — MyMemory API + localStorage `tr:en-ko:v1:` 접두사 + in-flight Map dedup + 원문 echo 캐시 차단
+- [x] `NewsFeed.tsx` 3단계 — 현재 카드 + 인접 4건 prefetch. 캐시 hydration. 한글 메인 + 영문 작은 회색 이탤릭 보조. pending 시 "번역 중…" pill
+- [x] 섹션 chip — 라벨 + 카운트 배지 + 색상 dot (감성 그룹 시 긍정 녹/중립 회/부정 적)
+- [x] 빌드 검증 — 594KB / gzip 175.6KB
+
+---
+
+## Stage 2.5 · 강세장 정점 신호 — 1차 구현 (키 불필요 3 지표) ✓ (2026-05-18 후속)
+
+> 설계 결정 (2026-05-18 후속)
+> - **우선순위** — 사용자 액션(CMC key) 없이 즉시 가능한 영역부터. CoinGecko `/global` + BTC candles 자체 계산만으로 인프라 + 첫 적재 검증.
+> - **status 컬럼** — 데이터 부족(< 200d/350d)은 `insufficient_data`로 행 적재. skip 대신 운영 가시성 확보.
+> - **threshold 정의** — Mayer ≥ 2.4 / Pi Cycle ≥ 1.0 (역사적 사이클 top). BTC 도미넌스는 임계 없이 표시만.
+
+- [x] `worker/migrations/0008_peak_signals.sql` — signal_key / value / threshold / hit / progress_pct / source / status / note / captured_at. UNIQUE(signal_key, captured_at) + CHECK(status), 인덱스 2종, RLS 2정책
+- [x] **사용자 액션** — Supabase SQL Editor에서 0008 실행 완료
+- [x] `worker/peak_signals_poller.py` — 3 지표 계산기 (compute_btc_dominance / compute_mayer_multiple / compute_pi_cycle_top), insufficient_data·error 폴백
+- [x] `.github/workflows/peak-signals.yml` — cron `30 2 * * *` + workflow_dispatch
+- [x] `frontend/src/lib/peakSignals.ts` — fetchLatestPeakSignals (signal_key별 최신 1행 클라이언트 grouping) + SIGNAL_META 라벨/설명
+- [x] `frontend/src/components/PeakSignals.tsx` — 표 UI (헤더 명중/평균 진행률 + 컬럼 # · 지표 · 현재값 · 기준값 · 명중 배지 · 진행률 막대 · source + 면책)
+- [x] AppShell — 포트폴리오 ↔ PeakSignals ↔ 뉴스 순서
+- [x] **BTC 캔들 365일 백필** — `gh workflow run candle-poll.yml -f days=365` 실행 → 371행 (2025-05-19 ~ 2026-05-18)
+- [x] **로컬 첫 적재 검증** — 3 지표 모두 status=ok. btc_dominance 58.19% / mayer_multiple 0.9538 (hit=False, 39.74%) / pi_cycle_top 0.3832 (hit=False, 38.32%)
+- [ ] **push 후 GitHub Actions workflow_dispatch 검증** — push 보류로 미진행. push 시 즉시 가능
+- [ ] **자동 진행 — peak-signals cron 매일 02:30 UTC 발화 관측**
+
+### 2.5-B1 자체계산 확장 ✓ 완료 (2026-05-18 후속)
+
+> 7개 지표로 확장. 모든 계산은 worker에서 CoinGecko + BTC candles만으로 처리(외부 키 0).
+
+- [x] **btc_dominance** — threshold=70% 추가 (단일 voltage 명중 판정). 코드 1줄
+- [x] **btc_rsi_22** — BTC 일봉 22일 RSI (peak_signals_poller.py 신규 함수). threshold 70 과매수
+- [x] **ahr999** — `(price/200d_geomean) × (price/regression_price)`. regression = `10^(5.84 × log10(age_days) - 17.01)`. threshold 1.2 매도 영역
+- [x] **rainbow_band** — log 회귀 baseline 기준 8 band 인덱스 (0-7). threshold ≥6 Bubble territory. AHR999와 동일 회귀식 사용
+- [x] **two_year_ma_multiple** — `price / 2y SMA`. threshold 5. 730일 누적 필요 — 현재 371일이라 `insufficient_data` 적재 (skeleton 활성, candle-poll 누적 시 자동 활성화)
+- [x] `lib/peakSignals.ts` — `SIGNAL_META` 4종 추가 + `unit` 필드(%/band/무차원) + `DISPLAY_ORDER` 7개로 확장
+- [x] `PeakSignals.tsx` — `formatValue()` 헬퍼로 단위별 표시 분기 (% 접미사 / `N / 7` band / 가변 정밀도)
+- [x] **로컬 워커 검증** — 7개 행 모두 적재. rainbow_band 회귀 계수 보정(blocks → days, 5.84/-17.01) 후 결과: dominance 58.21%(83.15%) / mayer 0.9538 / pi 0.3832 / rsi22 46.16 / ahr999 0.4715 / rainbow band 2 / 2y MA insufficient
+
+### 2.5-D 무료 온체인 ✓ 완료 (2026-05-18 후속)
+
+> bitcoin-data.com 무료 API (키 불필요, 응답 단순). 모든 호출은 `https://bitcoin-data.com/api/v1/{endpoint}/last`. 응답 — `{ d: 'YYYY-MM-DD', unixTs, <key>: float }`.
+
+- [x] `fetch_bitcoin_data()` 공통 헬퍼 — 429/HTTPError 백오프 + 응답 키 누락 방어
+- [x] `compute_onchain_indicator()` 공통 계산기 — 4 지표가 동일 구조라 1 함수로 통합
+- [x] **puell_multiple** — `/api/v1/puell-multiple/last` (key=`puellMultiple`). threshold 4.0. 일일 채굴 발행량 × 가격 / 365d 평균
+- [x] **mvrv_z_score** — `/api/v1/mvrv-zscore/last` (key=`mvrvZscore`). threshold 7.0. (mcap − Realized Cap) / 표준편차
+- [x] **nupl** — `/api/v1/nupl/last` (key=`nupl`). threshold 0.75. Net Unrealized Profit/Loss
+- [x] **mvrv_ratio** — `/api/v1/mvrv/last` (key=`mvrv`). threshold 3.7. mcap / Realized Cap
+- [x] `lib/peakSignals.ts` SIGNAL_META 4종 추가 + DISPLAY_ORDER 11개로 확장. note에 `data_date`(원 API 일자) 기록
+- [x] **로컬 워커 검증 (2026-05-18 03:55 UTC)** — 11 행 적재. 4 온체인 결과:
+  - puell_multiple 0.7923 (19.81% / hit False) — 데이터 2026-05-17
+  - mvrv_z_score 0.8177 (11.68% / hit False)
+  - nupl 0.3087 (41.16% / hit False)
+  - mvrv_ratio 1.4465 (39.09% / hit False)
+- [x] 빌드 통과 — 610KB / gzip 179KB
+
+### 2.5-C 합법 무료 — Strategy(MSTR) BTC 보유 ✓ 완료 (2026-05-18 후속)
+
+> 설계 결정 — SEC EDGAR 8-K 직접 파싱은 비매입 공시(컨버터블 노트 환매 등)와 매입 공시가 섞여 있어 정형 파싱 안정성 낮음. CoinGecko의 무료 `/companies/public_treasury/bitcoin` endpoint가 Strategy 포함 BTC 보유 상장사 데이터를 직접 제공하므로 채택.
+
+- [x] `fetch_treasury()` — CoinGecko `/companies/public_treasury/bitcoin` (키 불필요, 429 백오프 + 응답 방어)
+- [x] `_find_strategy()` — name=`Strategy` 또는 `MicroStrategy` 매칭 (2025 rebrand 대응)
+- [x] **mstr_btc_holdings** — Strategy의 BTC 보유 수량. 정보성 (threshold 없음). note에 `pct_of_supply` 기록
+- [x] **mstr_pnl_ratio** — `total_current_value_usd / total_entry_value_usd`. threshold 2.0 (2021/2024 사이클 top ratio ~2.4-2.5). note에 holdings/entry/current/avg_cost 기록
+- [x] `lib/peakSignals.ts` SIGNAL_META 2종 추가 + `unit: 'BTC'` 타입 확장 + DISPLAY_ORDER 13개로 확장
+- [x] `PeakSignals.tsx` `formatValue()` — `unit='BTC'` 분기 추가 (`818,869 BTC` 콤마 포맷)
+- [x] **로컬 워커 검증 (2026-05-18)** — Strategy 818,869 BTC (전체 공급 3.899%) / PnL ratio 1.0193 (50.96% / hit False, BTC ~$76k가 MSTR 평균 매입가 ~$75.5k와 거의 동등)
+
+### 2.5-C ETF flow — CoinGlass Hobbyist 도입 결정 (2026-05-18 후속)
+
+> 사용자 결정 — CoinGlass Hobbyist tier($29/월) 도입으로 ETF flow + 기타 정점 지표 확장. 코드 작업은 사용자 키 발급 + endpoint 확인 후 진행.
+
+#### 사용자 액션 (4단계)
+- [ ] **① CoinGlass 가입** — https://www.coinglass.com/ 우측 상단 Sign Up. 이메일 인증.
+- [ ] **② Hobbyist plan 결제** — https://www.coinglass.com/pricing 에서 **Hobbyist $29/월** 선택. 카드 결제 또는 USDT.
+- [ ] **③ API key 발급** — https://www.coinglass.com/api/account 또는 `Profile → API`에서 `Create Key`. 키 본문은 채팅에 절대 노출 금지.
+- [ ] **④ 키 저장 (2곳)**:
+  - 로컬 검증용 — `worker/.env`에 `COINGLASS_API_KEY=<발급값>` 추가
+  - GitHub Actions cron용 — `gh secret set COINGLASS_API_KEY` 또는 GitHub UI `Settings → Secrets and variables → Actions → New repository secret`
+
+#### 워커·UI 인프라 (사용자 액션 이전에 가능한 준비)
+- [x] `worker/.env.example` — `COINGLASS_API_KEY=` placeholder + 가입 안내
+- [x] `.github/workflows/peak-signals.yml` — `COINGLASS_API_KEY: ${{ secrets.COINGLASS_API_KEY }}` env 주입
+- [ ] **사용자 키 발급 신호 후** — endpoint 확인 + `compute_etf_flow()` 등 추가
+  - ETF flow daily net (BTC ETF 일별 순유입/순유출 USD)
+  - ETF cumulative holdings (총 BTC 보유량)
+  - 가능하면 fund-level breakdown (IBIT, FBTC, GBTC 등)
+
+### 다음 우선순위 (2.5 확장)
+- [ ] **2.5-B0 CMC 공식 API** — 사용자 액션: CoinMarketCap Pro Basic key 발급 (Altcoin Season Index 우선)
+- [ ] Bull Market Support Band (20wSMA + 21wEMA) — 정점 신호 관점에선 부적합. 별도 "사이클 phase" 섹션으로 분리 검토

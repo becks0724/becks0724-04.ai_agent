@@ -4,23 +4,24 @@
 크립토 포트폴리오 모니터링과 뉴스·지표 대시보드를 제공하는 웹 애플리케이션이다.
 사용자는 수동으로 보유 자산을 입력하고, 실시간 시세·기술적 지표·뉴스 감성을 한 화면에서 확인한다.
 
-## 현재 단계 (2026-05-18 기준)
+## 현재 단계 (2026-05-18 후속 #2 세션 기준)
 - **Stage 0 완료** — Git/스캐폴드/GitHub(`becks0724/becks0724-04.ai_agent` **public**)/Supabase(Singapore)/Vercel(`crypto-monitoring-one.vercel.app`) 검증 완료.
-- **Stage 1 MVP 완료** — `portfolio_holdings`, `price_snapshots`, RLS 4+1, 워커 시세 폴러(CoinGecko 15종, 백오프), 프론트 CRUD(Magic Link + KRW↔USD + 평가금액·손익 + 30초 polling), 검증 모두 통과.
-- **auth 리팩토링 완료** — `useAuth` 훅을 `AuthProvider` Context로 승격, session/userId prop drilling 제거, `signOut`/`error` 상태 노출, env vars explicit throw.
-- **Stage 2 완료** — 5개 sub-stage 모두 검증 통과.
-  - 2-A 캔들 데이터 모델 (`candles` 테이블, RLS 2)
-  - 2-B OHLCV 폴러 (CoinGecko `/coins/{id}/market_chart?interval=daily`, close+volume, open/high/low=close). 90일 백필 273행.
-  - 2-C 공포·탐욕 지수 (Alternative.me 무료, 일 1회. 헤더 위젯 — 분류별 색상)
-  - 2-D RSI 14 / MACD 12,26,9 (pandas, `indicators` 테이블 279행 적재). BTC RSI 35.80 / ETH 23.84 / SOL 41.86.
-  - 2-E 차트 모달 (lightweight-charts v5.2, line chart + 최신 RSI/MACD 텍스트, ESC 닫기, 면책 문구). HoldingsList "차트" 버튼으로 호출.
-- **Stage 3 뉴스 완료** — RSS 4 sources + `news`/`news_ticker_map` + `news-poll.yml`. 첫 적재 102 entries / 69 ticker_links 검증 완료.
-- **Stage 2.6 coins_catalog + 동적 모드 완료** — `coins_catalog` 5000위 + 워커 동적 매핑 + HoldingForm 자동완성 + FET 검증.
-- **ChartModal fix** — UTCTimestamp+dedup, MACD 가변 정밀도.
-- **Stage 4 LLM 분류 코드 완료, 점진 백필** — Google Gemini 무료 tier(`gemini-2.5-flash-lite`, thinking_budget=0). news_classifications + news_classifier + news-classify.yml(매시간 :15 UTC) + NewsFeed 배지/태그. **무료 RPD 20 한도** — cron이 일 ~20건씩 약 4일에 걸쳐 102건 백필. 현재 약 34건 적재.
-- **워커 호스팅** — GitHub Actions cron **7개 워크플로** (price-poll 15분, fear-greed 01:00, candle-poll 01:15, indicators 01:30, news-poll 매시간 :05, coins-catalog 02:00, **news-classify 매시간 :15**). 모든 workflow_dispatch 성공.
-- **다음 본 작업** — Stage 2.5(강세장 정점, CMC key 필요) 또는 Stage 5(실시간화).
-- 세부 진행 사항은 `progress.md`, 작업 단위 체크리스트는 `checklist.md`.
+- **Stage 1 MVP 완료** — `portfolio_holdings`, `price_snapshots`, RLS 4+1, 워커 시세 폴러, 프론트 CRUD, 검증 모두 통과.
+- **auth 리팩토링 완료** — `AuthProvider` Context 패턴, signOut/error 노출, env explicit throw.
+- **Stage 2 완료** — 5개 sub-stage. 2-E는 **multi-pane 차트** — v5 `paneIndex` API로 가격(0) + RSI 14(1, 30·70 reference 점선) + MACD(2, line+Signal+Histogram, 0 reference) 세로 3단 동기 차트.
+- **Stage 3 뉴스 완료** — RSS 4 sources, 102 entries / 69 ticker_links.
+- **Stage 2.6 coins_catalog + 동적 모드 완료** — 5000위 catalog + 워커 동적 매핑.
+- **Stage 4 LLM 분류** — Gemini 2.5 Flash-Lite, RPD 20 한도. 약 34/102 적재, cron 점진 백필.
+- **Coinbase 디자인 적용 완료** — `frontend/DESIGN.md` 토큰 사양서 + Inter/JetBrains Mono + 흰 캔버스 + 단일 voltage `#0052ff` + pill 100px + xl 24px. 6개 컴포넌트(Login/AppShell/HoldingForm/HoldingsList/NewsFeed/ChartModal) 리스킨. PeakSignals 신규 컴포넌트도 동일 토큰으로 적용.
+- **NewsFeed 카드 캐러셀 + 한글 번역** — 섹션 chip(감성/카테고리/종목/시간순) 점프 + ←/→ 순환 + N/M 카운터. MyMemory 무료 번역(localStorage 영구 캐시, 인접 prefetch). 영문 원본은 작은 회색 이탤릭 보조.
+- **Stage 2.5 진행 중 (14 / ~23 = 60.9%)** — `peak_signals` 테이블 + 워커 + cron 02:30 UTC + 프론트 표 UI. 14개 지표 로컬 적재 검증:
+  - **status=ok 12** — 자체계산 5(Mayer/Pi Cycle/RSI22/AHR999/Rainbow) + 도미넌스(CoinGecko) + 온체인 4(Puell/MVRV-Z/NUPL/MVRV via bitcoin-data.com) + MSTR 2(CoinGecko `/companies/public_treasury/bitcoin`)
+  - **status=insufficient_data 2** — `two_year_ma_multiple`(730d 필요, 현 372d, candle-poll 누적으로 자동 활성화) / `altcoin_season_index`(CMC_API_KEY 사용자 액션 대기)
+  - **보류** — ETF flow(CoinGlass Hobbyist $29/월 결정 보류) / Bull Market Support Band(정점 신호 부적합)
+- **운영 안정화** — bitcoin-data.com 분당 한도(60s cooldown) 대응 — 첫 retry 60초 fixed sleep + upsert 가드(`status='error'`는 같은 captured_at에 ok 행 있으면 skip).
+- **워커 호스팅** — GitHub Actions cron **8개 워크플로** (price-poll 15분, fear-greed 01:00, candle-poll 01:15, indicators 01:30, news-poll 매시간 :05, coins-catalog 02:00, news-classify 매시간 :15, **peak-signals 02:30**). peak-signals.yml은 push 보류로 main 미발화 — push 시 자동 발화.
+- **다음 본 작업** — 누적 변경 push 결정 → CMC Pro Basic key 발급(2.5-B0 활성화) → 추가 확장(CoinGlass 결정 / Stage 5 실시간화).
+- 세부 진행 사항은 `progress.md`, 작업 단위 체크리스트는 `checklist.md`, 디자인 토큰은 `frontend/DESIGN.md`.
 
 ## 기술 스택
 - **프론트엔드** — React + Vite (TypeScript), Vercel 배포
@@ -38,10 +39,12 @@
 │   ├── indicators.yml       # 30 1 * * * RSI/MACD 계산 (동적 모드)
 │   ├── news-poll.yml        # 5 * * * * RSS 4 sources 뉴스 폴러
 │   ├── coins-catalog.yml    # 0 2 * * * 시총 5000위 메타데이터 (workflow_dispatch total input)
-│   └── news-classify.yml    # 15 * * * * Gemini 분류 (workflow_dispatch batch input)
+│   ├── news-classify.yml    # 15 * * * * Gemini 분류 (workflow_dispatch batch input)
+│   └── peak-signals.yml     # 30 2 * * * 강세장 정점 신호 3 지표 계산 (push 후 발화)
 ├── frontend/                # React + Vite TS (Vercel 배포)
-│   ├── src/lib/             # supabase, useAuth(AuthContext), holdings, prices, fx, errors, fearGreed, candles, indicatorsApi, news, coins
-│   └── src/components/      # Login, AppShell, HoldingForm(자동완성), HoldingsList, ChartModal, NewsFeed
+│   ├── DESIGN.md            # Coinbase 디자인 토큰 사양서 (getdesign add coinbase)
+│   ├── src/lib/             # supabase, useAuth(AuthContext), holdings, prices, fx, errors, fearGreed, candles, indicatorsApi, news, coins, peakSignals, translate
+│   └── src/components/      # Login, AppShell, HoldingForm(자동완성), HoldingsList, ChartModal(multi-pane), NewsFeed(카드 캐러셀+번역), PeakSignals
 ├── worker/                  # Python 3.11
 │   ├── price_poller.py      # CoinGecko /simple/price (동적 모드)
 │   ├── fear_greed_poller.py # Alternative.me /fng
@@ -52,8 +55,9 @@
 │   ├── coins_catalog_poller.py # CoinGecko /coins/markets 5000위 적재 (pass1/2 재시도)
 │   ├── symbol_resolver.py   # portfolio_holdings → coins_catalog 동적 매핑
 │   ├── news_classifier.py   # Gemini 2.5 Flash-Lite (sentiment + event_category, JSON 응답)
+│   ├── peak_signals_poller.py # BTC 도미넌스(CoinGecko /global) + Mayer Multiple + Pi Cycle Top
 │   ├── coingecko_ids.py     # 심볼 → coingecko_id 정적 매핑 (15종, fallback용)
-│   └── migrations/          # 0001_init / 0002_candles / 0003_fear_greed / 0004_indicators / 0005_news / 0006_coins_catalog / 0007_news_classifications
+│   └── migrations/          # 0001_init / 0002_candles / 0003_fear_greed / 0004_indicators / 0005_news / 0006_coins_catalog / 0007_news_classifications / 0008_peak_signals
 ├── CLAUDE.md
 ├── checklist.md
 └── progress.md
@@ -88,3 +92,12 @@
 1. 보안 — 키 노출 금지, 읽기 전용 권한
 2. 단순성 — 최소 코드, 추측성 추상화 금지
 3. 검증 가능성 — 각 단계가 독립적으로 동작 확인 가능해야 함
+
+## 디자인 시스템 (2026-05-18 후속 적용)
+- **출처** — `frontend/DESIGN.md` (`npx getdesign@latest add coinbase` 생성). 전체 토큰·컴포넌트 사양은 이 파일을 기준으로 한다.
+- **voltage** — Coinbase Blue `#0052ff` 단 하나. primary CTA / brand wordmark / 인라인 강조 링크에만 사용.
+- **trading semantics** — up `#05b169` / down `#cf202f`는 텍스트 컬러로만. 배경 fill 금지.
+- **geometry** — pill 100px(액션·탭·배지) / xl 24px(카드) / full 9999px(아이콘) / md 12px(input). sharp 0px 금지.
+- **typography** — `Inter`(CoinbaseDisplay/Sans 대체) + `JetBrains Mono`(CoinbaseMono 대체). 모든 숫자는 mono 폰트.
+- **rhythm** — 흰 캔버스 + soft gray(#f7f7f7) + hairline(#dee1e6). 단일 shadow tier.
+- 새 UI 추가 시 `frontend/DESIGN.md` 토큰을 먼저 참조한 뒤 컴포넌트를 작성한다.
