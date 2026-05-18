@@ -1,11 +1,15 @@
 // 신규 보유 자산 등록 폼. 매수단가는 KRW/USD 양방향 자동 환산.
 // fx 상태는 AppShell이 보유하고 prop으로 내려준다. userId는 useAuth()로 직접 조회.
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../lib/useAuth'
 import { createHolding } from '../lib/holdings'
 import type { Holding } from '../lib/holdings'
 import type { UsdKrwRate } from '../lib/fx'
 import { normalizeError } from '../lib/errors'
+import { fetchTopCoins, searchCoins } from '../lib/coins'
+import type { CoinOption } from '../lib/coins'
+
+const SUGGEST_DEBOUNCE_MS = 200
 
 type Props = {
   fx: UsdKrwRate | null
@@ -23,6 +27,28 @@ export function HoldingForm({ fx, fxLoading, fxError, onReloadFx, onCreated }: P
   const [usd, setUsd] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // coins_catalog 자동완성. query 디바운스 200ms로 호출 부담 감소.
+  const [suggestions, setSuggestions] = useState<CoinOption[]>([])
+  const debounceRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    // 초기 마운트 시 상위 30개 로드. 입력이 비어있을 때 표시.
+    fetchTopCoins().then(setSuggestions).catch(() => setSuggestions([]))
+  }, [])
+
+  useEffect(() => {
+    if (debounceRef.current !== null) window.clearTimeout(debounceRef.current)
+    const q = symbol.trim()
+    debounceRef.current = window.setTimeout(() => {
+      searchCoins(q).then(setSuggestions).catch(() => {
+        // 자동완성 실패는 silent (직접 입력으로 진행 가능)
+      })
+    }, SUGGEST_DEBOUNCE_MS)
+    return () => {
+      if (debounceRef.current !== null) window.clearTimeout(debounceRef.current)
+    }
+  }, [symbol])
 
   const onChangeKrw = (next: string) => {
     setKrw(next)
@@ -103,12 +129,23 @@ export function HoldingForm({ fx, fxLoading, fxError, onReloadFx, onCreated }: P
             type="text"
             value={symbol}
             onChange={(e) => setSymbol(e.target.value)}
-            placeholder="BTC"
+            placeholder="BTC / Bitcoin"
             style={styles.input}
             disabled={submitting}
-            maxLength={16}
+            maxLength={32}
+            list="coins-suggest"
+            autoComplete="off"
             required
           />
+          <datalist id="coins-suggest">
+            {suggestions.map((c) => (
+              <option
+                key={c.coingeckoId}
+                value={c.symbol}
+                label={`${c.name}${c.marketCapRank ? ` (#${c.marketCapRank})` : ''}`}
+              />
+            ))}
+          </datalist>
         </label>
         <label style={styles.label}>
           수량
