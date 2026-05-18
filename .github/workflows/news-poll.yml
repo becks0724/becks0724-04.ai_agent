@@ -1,0 +1,51 @@
+# RSS 피드 4종에서 최신 기사를 받아 Supabase news/news_ticker_map에 적재한다.
+# 워커는 POLL_ONCE=1 모드로 1회 실행 후 종료. url unique upsert로 중복은 자동 차단.
+#
+# 주기: 매시간 :05 UTC. 다른 cron들과 시각이 겹치지 않게 둔다.
+
+name: news poller
+
+on:
+  schedule:
+    - cron: '5 * * * *'
+  workflow_dispatch:
+    inputs:
+      feeds:
+        description: '오버라이드용 NEWS_FEEDS (콤마구분 "source|url"). 빈 값이면 DEFAULT_FEEDS 사용.'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: news-poll
+  cancel-in-progress: false
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: worker/requirements.txt
+
+      - name: Install deps
+        run: pip install -r worker/requirements.txt
+
+      - name: Run news poller (1회 적재)
+        working-directory: worker
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          POLL_ONCE: '1'
+          NEWS_FEEDS: ${{ inputs.feeds || '' }}
+          WORKER_ENV: github-actions
+        run: python news_poller.py
