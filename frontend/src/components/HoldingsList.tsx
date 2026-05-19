@@ -21,6 +21,7 @@ export function HoldingsList({ holdings, prices, fx, onChanged }: Props) {
   const [busyId, setBusyId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [chartSymbol, setChartSymbol] = useState<string | null>(null)
+  const [collapsed, setCollapsed] = useState(false)
 
   if (holdings.length === 0) {
     return (
@@ -73,165 +74,177 @@ export function HoldingsList({ holdings, prices, fx, onChanged }: Props) {
 
   return (
     <div style={styles.card}>
+      <div style={styles.cardHeader}>
+        <span>보유 자산</span>
+        <button
+          type="button"
+          style={styles.toggleButton}
+          onClick={() => setCollapsed((next) => !next)}
+          aria-expanded={!collapsed}
+        >
+          {collapsed ? '펼치기' : '숨기기'}
+        </button>
+      </div>
       {error && <p style={styles.error}>{error}</p>}
-      <div style={styles.cardHeader}>보유 자산</div>
-      <table style={styles.table}>
-        <thead>
-          <tr>
-            <th style={styles.th}>심볼</th>
-            <th style={styles.thRight}>수량</th>
-            <th style={styles.thRight}>매수단가 (USD)</th>
-            <th style={styles.thRight}>현재가 (USD)</th>
-            <th style={styles.thRight}>평가금액</th>
-            <th style={styles.thRight}>손익</th>
-            <th style={styles.thActions}>액션</th>
-          </tr>
-        </thead>
-        <tbody>
-          {holdings.map((h) => {
-            const editing = editingId === h.id
-            const busy = busyId === h.id
-            const snap = prices.get(h.symbol)
-            const cost = h.quantity * h.avg_buy_price
-            const value = snap ? h.quantity * snap.price_usd : null
-            const pnl = value !== null ? value - cost : null
-            const pnlPct = pnl !== null && cost > 0 ? (pnl / cost) * 100 : null
-            const pnlColor =
-              pnl === null ? '#5b616e' : pnl > 0 ? '#05b169' : pnl < 0 ? '#cf202f' : '#5b616e'
-            const priceChangeColor = getPriceChangeColor(snap?.price_change_24h_pct ?? null)
-            return (
-              <tr key={h.id} style={styles.tr}>
-                <td style={styles.tdSymbol}>
-                  <div style={styles.symbolWrap}>
-                    <div style={styles.assetIcon}>{h.symbol.charAt(0)}</div>
-                    <div>
-                      <div style={styles.symbolTicker}>{h.symbol}</div>
+      {!collapsed && (
+        <table style={styles.table}>
+          <thead>
+            <tr>
+              <th style={styles.th}>심볼</th>
+              <th style={styles.thRight}>수량</th>
+              <th style={styles.thRight}>매수단가 (USD)</th>
+              <th style={styles.thRight}>현재가 (USD)</th>
+              <th style={styles.thRight}>평가금액</th>
+              <th style={styles.thRight}>손익</th>
+              <th style={styles.thActions}>액션</th>
+            </tr>
+          </thead>
+          <tbody>
+            {holdings.map((h) => {
+              const editing = editingId === h.id
+              const busy = busyId === h.id
+              const snap = prices.get(h.symbol)
+              const cost = h.quantity * h.avg_buy_price
+              const value = snap ? h.quantity * snap.price_usd : null
+              const pnl = value !== null ? value - cost : null
+              const pnlPct = pnl !== null && cost > 0 ? (pnl / cost) * 100 : null
+              const pnlColor =
+                pnl === null ? '#5b616e' : pnl > 0 ? '#05b169' : pnl < 0 ? '#cf202f' : '#5b616e'
+              const priceChangeColor = getPriceChangeColor(snap?.price_change_24h_pct ?? null)
+              return (
+                <tr key={h.id} style={styles.tr}>
+                  <td style={styles.tdSymbol}>
+                    <div style={styles.symbolWrap}>
+                      <div style={styles.assetIcon}>{h.symbol.charAt(0)}</div>
+                      <div>
+                        <div style={styles.symbolTicker}>{h.symbol}</div>
+                      </div>
                     </div>
-                  </div>
-                </td>
-                <td style={styles.tdRight}>
-                  {editing ? (
-                    <input
-                      type="number"
-                      step="any"
-                      min="0"
-                      value={draftQty}
-                      onChange={(e) => setDraftQty(e.target.value)}
-                      style={styles.cellInput}
-                      disabled={busy}
-                    />
-                  ) : (
-                    formatNumber(h.quantity)
-                  )}
-                </td>
-                <td style={styles.tdRight}>
-                  {editing ? (
-                    <input
-                      type="number"
-                      step="any"
-                      min="0"
-                      value={draftPrice}
-                      onChange={(e) => setDraftPrice(e.target.value)}
-                      style={styles.cellInput}
-                      disabled={busy}
-                    />
-                  ) : (
-                    formatUsd(h.avg_buy_price)
-                  )}
-                </td>
-                <td style={styles.tdRight}>
-                  {snap ? (
-                    <>
-                      <div style={styles.priceMain}>{formatUsd(snap.price_usd)}</div>
-                      <div style={{ ...styles.priceChange, color: priceChangeColor }}>
-                        {formatPct(snap.price_change_24h_pct)}
-                      </div>
-                    </>
-                  ) : (
-                    '—'
-                  )}
-                </td>
-                <td style={styles.tdRight}>
-                  {value !== null ? (
-                    <>
-                      <div style={styles.priceMain}>{formatUsd(value)}</div>
-                      <div style={styles.subKrw}>{formatKrw(value, fx)}</div>
-                    </>
-                  ) : (
-                    '—'
-                  )}
-                </td>
-                <td style={{ ...styles.tdRight, color: pnlColor }}>
-                  {pnl !== null ? (
-                    <>
-                      <div style={styles.priceMain}>
-                        {formatUsd(pnl)}
-                        {pnlPct !== null && (
-                          <span style={styles.pct}> ({pnlPct.toFixed(2)}%)</span>
-                        )}
-                      </div>
-                      <div style={{ ...styles.subKrw, color: pnlColor, opacity: 0.7 }}>
-                        {formatKrw(pnl, fx)}
-                      </div>
-                    </>
-                  ) : (
-                    '—'
-                  )}
-                </td>
-                <td style={styles.tdActions}>
-                  {editing ? (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => saveEdit(h)}
+                  </td>
+                  <td style={styles.tdRight}>
+                    {editing ? (
+                      <input
+                        type="number"
+                        step="any"
+                        min="0"
+                        value={draftQty}
+                        onChange={(e) => setDraftQty(e.target.value)}
+                        style={styles.cellInput}
                         disabled={busy}
-                        style={styles.actionPrimary}
-                      >
-                        저장
-                      </button>
-                      <button
-                        type="button"
-                        onClick={cancelEdit}
+                      />
+                    ) : (
+                      formatNumber(h.quantity)
+                    )}
+                  </td>
+                  <td style={styles.tdRight}>
+                    {editing ? (
+                      <input
+                        type="number"
+                        step="any"
+                        min="0"
+                        value={draftPrice}
+                        onChange={(e) => setDraftPrice(e.target.value)}
+                        style={styles.cellInput}
                         disabled={busy}
-                        style={styles.actionGhost}
-                      >
-                        취소
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => setChartSymbol(h.symbol)}
-                        disabled={busy}
-                        style={styles.actionGhost}
-                      >
-                        차트
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => startEdit(h)}
-                        disabled={busy}
-                        style={styles.actionGhost}
-                      >
-                        수정
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => remove(h)}
-                        disabled={busy}
-                        style={styles.actionDanger}
-                      >
-                        삭제
-                      </button>
-                    </>
-                  )}
-                </td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
+                      />
+                    ) : (
+                      formatUsd(h.avg_buy_price)
+                    )}
+                  </td>
+                  <td style={styles.tdRight}>
+                    {snap ? (
+                      <>
+                        <div style={styles.priceMain}>{formatUsd(snap.price_usd)}</div>
+                        <div style={{ ...styles.priceChange, color: priceChangeColor }}>
+                          {formatPct(snap.price_change_24h_pct)}
+                        </div>
+                      </>
+                    ) : (
+                      '—'
+                    )}
+                  </td>
+                  <td style={styles.tdRight}>
+                    {value !== null ? (
+                      <>
+                        <div style={styles.priceMain}>{formatUsd(value)}</div>
+                        <div style={styles.subKrw}>{formatKrw(value, fx)}</div>
+                      </>
+                    ) : (
+                      '—'
+                    )}
+                  </td>
+                  <td style={{ ...styles.tdRight, color: pnlColor }}>
+                    {pnl !== null ? (
+                      <>
+                        <div style={styles.priceMain}>
+                          {formatUsd(pnl)}
+                          {pnlPct !== null && (
+                            <span style={styles.pct}> ({pnlPct.toFixed(2)}%)</span>
+                          )}
+                        </div>
+                        <div style={{ ...styles.subKrw, color: pnlColor, opacity: 0.7 }}>
+                          {formatKrw(pnl, fx)}
+                        </div>
+                      </>
+                    ) : (
+                      '—'
+                    )}
+                  </td>
+                  <td style={styles.tdActions}>
+                    {editing ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => saveEdit(h)}
+                          disabled={busy}
+                          style={styles.actionPrimary}
+                        >
+                          저장
+                        </button>
+                        <button
+                          type="button"
+                          onClick={cancelEdit}
+                          disabled={busy}
+                          style={styles.actionGhost}
+                        >
+                          취소
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setChartSymbol(h.symbol)}
+                          disabled={busy}
+                          style={styles.actionGhost}
+                        >
+                          차트
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => startEdit(h)}
+                          disabled={busy}
+                          style={styles.actionGhost}
+                        >
+                          수정
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => remove(h)}
+                          disabled={busy}
+                          style={styles.actionDanger}
+                        >
+                          삭제
+                        </button>
+                      </>
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      )}
       {chartSymbol && (
         <ChartModal symbol={chartSymbol} onClose={() => setChartSymbol(null)} />
       )}
@@ -275,10 +288,27 @@ const styles: Record<string, React.CSSProperties> = {
     overflow: 'hidden',
   },
   cardHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: '16px',
     fontSize: '18px',
     fontWeight: 600,
     color: '#0a0b0d',
     marginBottom: '16px',
+  },
+  toggleButton: {
+    padding: '6px 14px',
+    background: '#eef0f3',
+    border: 'none',
+    borderRadius: '100px',
+    color: '#0a0b0d',
+    fontSize: '13px',
+    fontWeight: 600,
+    cursor: 'pointer',
+    minWidth: '64px',
+    height: '32px',
+    whiteSpace: 'nowrap',
   },
   emptyCard: {
     background: '#ffffff',

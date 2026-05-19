@@ -19,6 +19,7 @@
   - **status=insufficient_data 2** — `two_year_ma_multiple`(730d 필요, 현 372d, candle-poll 누적으로 자동 활성화) / `altcoin_season_index`(CMC_API_KEY 사용자 액션 대기)
   - **보류** — USDT Flexible Savings(Binance Earn 스크랩 안정성 낮음) / CoinGlass Hobbyist $29/월 결정 / Bull Market Support Band(정점 신호 부적합)
 - **헤더 지표** — Fear & Greed 옆에 Altcoin Season Index 배지를 추가. CMC key 미발급 상태는 `Altcoin Season 대기`로 표시.
+- **대시보드 접기/펼치기** — 보유 자산 카드와 강세장 정점 신호 카드 우측에 `숨기기/펼치기` 토글 추가.
 - **운영 안정화** — bitcoin-data.com 분당 한도(60s cooldown) 대응 — 첫 retry 60초 fixed sleep + upsert 가드(`status='error'`는 같은 captured_at에 ok 행 있으면 skip).
 - **워커 호스팅** — GitHub Actions cron **8개 워크플로** (price-poll 15분, fear-greed 01:00, candle-poll 01:15, indicators 01:30, news-poll 매시간 :05, coins-catalog 02:00, news-classify 매시간 :15, **peak-signals 02:30**). `peak-signals.yml`은 workflow_dispatch 검증 성공(run `26081203527`), 최신 16행 적재 확인.
 - **최근 push 완료** — `bfef5e2 feat(stage2.5): add ETF flow peak signals`로 ETF 2개 지표를 배포하고 `11b1c82 fix(frontend): keep peak signal badges on one line`로 `미명중` 배지 줄바꿈 수정까지 Vercel Production success. 운영 URL `https://crypto-monitoring-one.vercel.app/` HTTP/2 200 확인.

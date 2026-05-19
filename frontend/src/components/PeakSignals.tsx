@@ -10,6 +10,7 @@ export function PeakSignals() {
   const [signals, setSignals] = useState<PeakSignal[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [collapsed, setCollapsed] = useState(false)
 
   useEffect(() => {
     let mounted = true
@@ -51,59 +52,73 @@ export function PeakSignals() {
           <h2 style={styles.title}>강세장 정점 신호</h2>
           <p style={styles.subtitle}>통계 표시 전용 · 매매 신호 아님</p>
         </div>
-        {hitable.length > 0 && (
-          <div style={styles.summary}>
-            <div style={styles.summaryItem}>
-              <div style={styles.summaryLabel}>명중</div>
-              <div style={styles.summaryValue}>
-                <span style={{ color: hits > 0 ? '#cf202f' : '#0a0b0d' }}>{hits}</span>
-                <span style={styles.summarySep}>/</span>
-                <span style={styles.summaryTotal}>{hitable.length}</span>
-              </div>
-            </div>
-            {avgProgress !== null && (
+        <div style={styles.headerActions}>
+          {hitable.length > 0 && (
+            <div style={styles.summary}>
               <div style={styles.summaryItem}>
-                <div style={styles.summaryLabel}>평균 진행률</div>
-                <div style={styles.summaryValue}>{avgProgress.toFixed(1)}%</div>
+                <div style={styles.summaryLabel}>명중</div>
+                <div style={styles.summaryValue}>
+                  <span style={{ color: hits > 0 ? '#cf202f' : '#0a0b0d' }}>{hits}</span>
+                  <span style={styles.summarySep}>/</span>
+                  <span style={styles.summaryTotal}>{hitable.length}</span>
+                </div>
               </div>
-            )}
-          </div>
-        )}
+              {avgProgress !== null && (
+                <div style={styles.summaryItem}>
+                  <div style={styles.summaryLabel}>평균 진행률</div>
+                  <div style={styles.summaryValue}>{avgProgress.toFixed(1)}%</div>
+                </div>
+              )}
+            </div>
+          )}
+          <button
+            type="button"
+            style={styles.toggleButton}
+            onClick={() => setCollapsed((next) => !next)}
+            aria-expanded={!collapsed}
+          >
+            {collapsed ? '펼치기' : '숨기기'}
+          </button>
+        </div>
       </header>
 
-      {loading && signals.length === 0 && <p style={styles.muted}>불러오는 중…</p>}
-      {error && <p style={styles.error}>지표 조회 오류: {error}</p>}
-      {!loading && !error && signals.length === 0 && (
-        <p style={styles.muted}>
-          적재된 지표가 없습니다. 워커 peak-signals이 1회 이상 실행되어야 합니다.
-        </p>
-      )}
+      {!collapsed && (
+        <>
+          {loading && signals.length === 0 && <p style={styles.muted}>불러오는 중…</p>}
+          {error && <p style={styles.error}>지표 조회 오류: {error}</p>}
+          {!loading && !error && signals.length === 0 && (
+            <p style={styles.muted}>
+              적재된 지표가 없습니다. 워커 peak-signals이 1회 이상 실행되어야 합니다.
+            </p>
+          )}
 
-      {signals.length > 0 && (
-        <table style={styles.table}>
-          <thead>
-            <tr>
-              <th style={styles.th}>#</th>
-              <th style={styles.thLeft}>지표</th>
-              <th style={styles.thRight}>현재값</th>
-              <th style={styles.thRight}>기준값</th>
-              <th style={styles.thCenter}>명중</th>
-              <th style={styles.thProgress}>진행률</th>
-              <th style={styles.thLeft}>비고</th>
-            </tr>
-          </thead>
-          <tbody>
-            {signals.map((s, idx) => (
-              <Row key={s.signalKey} idx={idx + 1} sig={s} />
-            ))}
-          </tbody>
-        </table>
-      )}
+          {signals.length > 0 && (
+            <table style={styles.table}>
+              <thead>
+                <tr>
+                  <th style={styles.th}>#</th>
+                  <th style={styles.thLeft}>지표</th>
+                  <th style={styles.thRight}>현재값</th>
+                  <th style={styles.thRight}>기준값</th>
+                  <th style={styles.thCenter}>명중</th>
+                  <th style={styles.thProgress}>진행률</th>
+                  <th style={styles.thLeft}>비고</th>
+                </tr>
+              </thead>
+              <tbody>
+                {signals.map((s, idx) => (
+                  <Row key={s.signalKey} idx={idx + 1} sig={s} />
+                ))}
+              </tbody>
+            </table>
+          )}
 
-      <p style={styles.disclaimer}>
-        ※ 통계 표시 전용. 매매 신호가 아닙니다. 각 지표는 데이터 누적 기간이 충분해야 의미를 가지며,
-        과거 패턴이 미래를 보장하지 않습니다. <em>insufficient_data</em>는 캔들 누적이 부족한 상태입니다.
-      </p>
+          <p style={styles.disclaimer}>
+            ※ 통계 표시 전용. 매매 신호가 아닙니다. 각 지표는 데이터 누적 기간이 충분해야 의미를 가지며,
+            과거 패턴이 미래를 보장하지 않습니다. <em>insufficient_data</em>는 캔들 누적이 부족한 상태입니다.
+          </p>
+        </>
+      )}
     </section>
   )
 }
@@ -240,6 +255,26 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '14px 20px',
     background: '#f7f7f7',
     borderRadius: '16px',
+  },
+  headerActions: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    flexWrap: 'wrap',
+    gap: '12px',
+  },
+  toggleButton: {
+    padding: '6px 14px',
+    background: '#eef0f3',
+    border: 'none',
+    borderRadius: '100px',
+    color: '#0a0b0d',
+    fontSize: '13px',
+    fontWeight: 600,
+    cursor: 'pointer',
+    minWidth: '64px',
+    height: '32px',
+    whiteSpace: 'nowrap',
   },
   summaryItem: { display: 'flex', flexDirection: 'column', gap: '4px' },
   summaryLabel: {
