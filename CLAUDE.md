@@ -6,7 +6,7 @@
 
 ## 현재 단계 (2026-05-19 후속 세션 기준)
 - **Stage 0 완료** — Git/스캐폴드/GitHub(`becks0724/becks0724-04.ai_agent` **public**)/Supabase(Singapore)/Vercel(`crypto-monitoring-one.vercel.app`) 검증 완료.
-- **Stage 1 MVP 완료** — `portfolio_holdings`, `price_snapshots`, RLS 4+1, 워커 시세 폴러, 프론트 CRUD, 검증 모두 통과.
+- **Stage 1 MVP 완료 + 현재가 24h 등락률 구현 중** — `portfolio_holdings`, `price_snapshots`, RLS 4+1, 워커 시세 폴러, 프론트 CRUD 완료. 현재 `price_change_24h_pct` nullable 컬럼용 `0009` 마이그레이션과 CoinGecko `usd_24h_change` 적재/표시 구현. Supabase SQL Editor에서 0009 실행 필요(현재 Supabase는 컬럼 없음, fallback insert 검증 완료).
 - **auth 리팩토링 완료** — `AuthProvider` Context 패턴, signOut/error 노출, env explicit throw.
 - **Stage 2 완료** — 5개 sub-stage. 2-E는 **multi-pane 차트** — v5 `paneIndex` API로 가격(0) + RSI 14(1, 30·70 reference 점선) + MACD(2, line+Signal+Histogram, 0 reference) 세로 3단 동기 차트.
 - **Stage 3 뉴스 완료** — RSS 4 sources, 102 entries / 69 ticker_links.
@@ -19,9 +19,9 @@
   - **status=insufficient_data 2** — `two_year_ma_multiple`(730d 필요, 현 372d, candle-poll 누적으로 자동 활성화) / `altcoin_season_index`(CMC_API_KEY 사용자 액션 대기)
   - **보류** — USDT Flexible Savings(Binance Earn 스크랩 안정성 낮음) / CoinGlass Hobbyist $29/월 결정 / Bull Market Support Band(정점 신호 부적합)
 - **운영 안정화** — bitcoin-data.com 분당 한도(60s cooldown) 대응 — 첫 retry 60초 fixed sleep + upsert 가드(`status='error'`는 같은 captured_at에 ok 행 있으면 skip).
-- **워커 호스팅** — GitHub Actions cron **8개 워크플로** (price-poll 15분, fear-greed 01:00, candle-poll 01:15, indicators 01:30, news-poll 매시간 :05, coins-catalog 02:00, news-classify 매시간 :15, **peak-signals 02:30**). peak-signals.yml은 push 보류로 main 미발화 — push 시 자동 발화.
-- **누적 push 완료 (세션 #3)** — 사용자가 5 commit 분할 가이드 그대로 실행 → `e38895b`(Coinbase 디자인 8) / `bc09ef1`(NewsFeed 캐러셀 3) / `9f53e1c`(ChartModal 1) / `fdecd96`(Stage 2.5 peak_signals 6) / `8940c3d`(docs 3) 5개 모두 origin/main 적용. Vercel webhook 자동 발화로 prod에 첫 반영. peak-signals.yml도 main에 올라가 cron 매일 02:30 UTC 자동 발화 시작. 본 세션 #3 코드 변경 0건(가이드만), 4 문서 갱신분만 working tree 잔여.
-- **다음 본 작업** — 2.5-C ETF flow 변경분 commit·push → Vercel Ready 확인 + 시각 검증 → `gh workflow run peak-signals.yml` 트리거로 GitHub Actions 16행 적재 검증 → CMC Pro Basic key 발급(2.5-B0 활성화) → 추가 확장(CoinGlass 결정 / Stage 5 실시간화).
+- **워커 호스팅** — GitHub Actions cron **8개 워크플로** (price-poll 15분, fear-greed 01:00, candle-poll 01:15, indicators 01:30, news-poll 매시간 :05, coins-catalog 02:00, news-classify 매시간 :15, **peak-signals 02:30**). `peak-signals.yml`은 workflow_dispatch 검증 성공(run `26081203527`), 최신 16행 적재 확인.
+- **최근 push 완료** — `bfef5e2 feat(stage2.5): add ETF flow peak signals`로 ETF 2개 지표를 배포하고 `11b1c82 fix(frontend): keep peak signal badges on one line`로 `미명중` 배지 줄바꿈 수정까지 Vercel Production success. 운영 URL `https://crypto-monitoring-one.vercel.app/` HTTP/2 200 확인.
+- **다음 본 작업** — Supabase SQL Editor에서 `worker/migrations/0009_price_change_24h.sql` 실행 → price-poll 1회 실행으로 24h 등락률 적재 확인 → CMC Pro Basic key 발급(2.5-B0 활성화) → 2026-05-20 이후 peak-signals cron 자동 발화 16행 관측 → CoinGlass 결정/USDT Flexible Savings 보류 재평가.
 - 세부 진행 사항은 `progress.md`, 작업 단위 체크리스트는 `checklist.md`, 디자인 토큰은 `frontend/DESIGN.md`.
 
 ## 기술 스택
@@ -41,13 +41,13 @@
 │   ├── news-poll.yml        # 5 * * * * RSS 4 sources 뉴스 폴러
 │   ├── coins-catalog.yml    # 0 2 * * * 시총 5000위 메타데이터 (workflow_dispatch total input)
 │   ├── news-classify.yml    # 15 * * * * Gemini 분류 (workflow_dispatch batch input)
-│   └── peak-signals.yml     # 30 2 * * * 강세장 정점 신호 3 지표 계산 (push 후 발화)
+│   └── peak-signals.yml     # 30 2 * * * 강세장 정점 신호 16 지표 계산
 ├── frontend/                # React + Vite TS (Vercel 배포)
 │   ├── DESIGN.md            # Coinbase 디자인 토큰 사양서 (getdesign add coinbase)
 │   ├── src/lib/             # supabase, useAuth(AuthContext), holdings, prices, fx, errors, fearGreed, candles, indicatorsApi, news, coins, peakSignals, translate
 │   └── src/components/      # Login, AppShell, HoldingForm(자동완성), HoldingsList, ChartModal(multi-pane), NewsFeed(카드 캐러셀+번역), PeakSignals
 ├── worker/                  # Python 3.11
-│   ├── price_poller.py      # CoinGecko /simple/price (동적 모드)
+│   ├── price_poller.py      # CoinGecko /simple/price + usd_24h_change (동적 모드)
 │   ├── fear_greed_poller.py # Alternative.me /fng
 │   ├── candle_poller.py     # CoinGecko /coins/{id}/market_chart (동적 모드)
 │   ├── indicators.py        # pandas RSI/MACD (동적 모드)
@@ -56,9 +56,9 @@
 │   ├── coins_catalog_poller.py # CoinGecko /coins/markets 5000위 적재 (pass1/2 재시도)
 │   ├── symbol_resolver.py   # portfolio_holdings → coins_catalog 동적 매핑
 │   ├── news_classifier.py   # Gemini 2.5 Flash-Lite (sentiment + event_category, JSON 응답)
-│   ├── peak_signals_poller.py # BTC 도미넌스(CoinGecko /global) + Mayer Multiple + Pi Cycle Top
+│   ├── peak_signals_poller.py # BTC 도미넌스/자체계산/온체인/Farside ETF/MSTR/CMC 지표
 │   ├── coingecko_ids.py     # 심볼 → coingecko_id 정적 매핑 (15종, fallback용)
-│   └── migrations/          # 0001_init / 0002_candles / 0003_fear_greed / 0004_indicators / 0005_news / 0006_coins_catalog / 0007_news_classifications / 0008_peak_signals
+│   └── migrations/          # 0001_init ... 0009_price_change_24h
 ├── CLAUDE.md
 ├── checklist.md
 └── progress.md

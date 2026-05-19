@@ -98,6 +98,7 @@ export function HoldingsList({ holdings, prices, fx, onChanged }: Props) {
             const pnlPct = pnl !== null && cost > 0 ? (pnl / cost) * 100 : null
             const pnlColor =
               pnl === null ? '#5b616e' : pnl > 0 ? '#05b169' : pnl < 0 ? '#cf202f' : '#5b616e'
+            const priceChangeColor = getPriceChangeColor(snap?.price_change_24h_pct ?? null)
             return (
               <tr key={h.id} style={styles.tr}>
                 <td style={styles.tdSymbol}>
@@ -138,7 +139,18 @@ export function HoldingsList({ holdings, prices, fx, onChanged }: Props) {
                     formatUsd(h.avg_buy_price)
                   )}
                 </td>
-                <td style={styles.tdRight}>{snap ? formatUsd(snap.price_usd) : '—'}</td>
+                <td style={styles.tdRight}>
+                  {snap ? (
+                    <>
+                      <div style={styles.priceMain}>{formatUsd(snap.price_usd)}</div>
+                      <div style={{ ...styles.priceChange, color: priceChangeColor }}>
+                        {formatPct(snap.price_change_24h_pct)}
+                      </div>
+                    </>
+                  ) : (
+                    '—'
+                  )}
+                </td>
                 <td style={styles.tdRight}>
                   {value !== null ? (
                     <>
@@ -241,6 +253,15 @@ function formatKrw(usd: number, fx: UsdKrwRate | null): string {
   if (!fx) return ''
   return `₩${new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 0 }).format(usd * fx.rate)}`
 }
+function formatPct(n: number | null): string {
+  if (n === null || !Number.isFinite(n)) return '—'
+  const sign = n > 0 ? '+' : ''
+  return `${sign}${n.toFixed(2)}%`
+}
+function getPriceChangeColor(n: number | null): string {
+  if (n === null || !Number.isFinite(n) || n === 0) return '#5b616e'
+  return n > 0 ? '#cf202f' : '#0052ff'
+}
 
 const numberFont = "'JetBrains Mono', ui-monospace, 'SF Mono', Consolas, monospace"
 
@@ -342,6 +363,12 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 500,
   },
   priceMain: { fontSize: '15px', fontWeight: 500 },
+  priceChange: {
+    fontSize: '12px',
+    marginTop: '4px',
+    fontFamily: numberFont,
+    fontWeight: 600,
+  },
   subKrw: {
     fontSize: '12px',
     color: '#5b616e',

@@ -4,15 +4,38 @@
 
 ---
 
-## 현재 상태 (2026-05-19 후속 세션 — **2.5-C ETF flow 2개 지표 구현**, 문서/검증 갱신)
+## 현재 상태 (2026-05-19 후속 세션 — **현재가 24h 등락률 구현 중**)
 
-**한 줄 요약** — `checklist.md`의 2.5-C 미처리 항목 중 ETF 2개를 진행. Farside 공개 BTC ETF flow 표 파서 추가 → `etf_outflow_streak`, `etf_net_flow_btc_mcap_pct` 계산 및 UI 메타데이터 반영. 실제 Farside+CoinGecko 데이터 계산 검증 완료 후 `POLL_ONCE=1` 워커로 Supabase 오늘자 16개 지표 적재 완료(최신 ETF 데이터 2026-05-18, 순유출 2거래일, flow/BTC mcap 3.7433%). USDT 플렉서블 세이빙은 Binance Earn 스크랩 안정성이 낮아 보류 유지.
+**한 줄 요약** — `현재가 (USD)` 셀 하단에 CoinGecko 24시간 등락률을 표시하는 기능을 구현 중. `price_snapshots.price_change_24h_pct` nullable 컬럼용 `0009` 마이그레이션 추가, `price_poller.py`가 `/simple/price?include_24hr_change=true` 응답의 `usd_24h_change`를 저장하도록 확장, 프론트 `HoldingsList`는 현재가 아래 `+/-N.NN%`를 표시한다. 색상은 한국식 규칙으로 상승 빨강(`#cf202f`), 하락 파랑(`#0052ff`), 보합/데이터 없음 회색(`#5b616e`).
+
+**본 세션 산출**
+- **현재가 24h 등락률 표시** — `frontend/src/components/HoldingsList.tsx` 현재가 셀을 2줄로 변경. 상단 현재가, 하단 24h 등락률. null이면 `—` 표시.
+- **시세 스키마 확장** — `worker/migrations/0009_price_change_24h.sql` 추가. `price_change_24h_pct numeric(12, 6)` nullable 컬럼.
+- **시세 워커 확장** — `worker/price_poller.py`가 CoinGecko `include_24hr_change=true`를 요청하고 `usd_24h_change`를 저장. 0009 미적용 환경에서는 경고 후 기존 컬럼만 fallback insert.
+- **프론트 조회 확장** — `frontend/src/lib/prices.ts`가 `price_change_24h_pct`를 조회. 0009 미적용 환경에서는 기존 컬럼 조회로 fallback해 가격 표가 깨지지 않게 처리.
+
+**마이그레이션 적용 필요**
+- Supabase SQL Editor에서 `worker/migrations/0009_price_change_24h.sql` 실행 필요. 로컬에는 `psql`/`supabase` CLI와 DB URL이 없어 DDL 직접 적용 불가.
+- 현재 Supabase 확인 결과 `price_snapshots.price_change_24h_pct`는 아직 없음(`42703`). 적용 전까지 프론트는 기존 가격 조회로 fallback, 워커는 기존 컬럼만 fallback insert한다.
+
+**검증 결과**
+- `python3 -m py_compile worker/price_poller.py` 통과.
+- `npm run build` 통과.
+- CoinGecko 파서 단위 확인: `bitcoin` 응답에서 `price_usd`와 `price_change_24h_pct` 파싱 성공.
+- `POLL_ONCE=1 .venv/bin/python3 price_poller.py` 실행: 0009 미적용 상태에서 fallback insert로 `inserted=3/3` 확인.
+
+---
+
+## 이전 상태 (2026-05-19 후속 세션 마감 — **2.5-C ETF flow + 배지 줄바꿈 수정 배포 완료**)
+
+**한 줄 요약** — `checklist.md`의 2.5-C 미처리 항목 중 ETF 2개를 진행하고 배포 완료. Farside 공개 BTC ETF flow 표 파서 추가 → `etf_outflow_streak`, `etf_net_flow_btc_mcap_pct` 계산 및 UI 메타데이터 반영. `bfef5e2 feat(stage2.5): add ETF flow peak signals` push 후 Vercel Production success, `peak-signals.yml` workflow_dispatch success, Supabase 최신 `captured_at=2026-05-19T00:00:00+00:00` 기준 16행 적재 확인. 이어서 `11b1c82 fix(frontend): keep peak signal badges on one line`로 `미명중` 배지 줄바꿈 수정까지 Vercel Production 배포 완료.
 
 **본 세션 산출**
 - **2.5-C ETF 순유출 일수** — Farside `bitcoin-etf-flow-all-data` 표 파서(`parse_farside_etf_flows`) + `compute_etf_outflow_streak()` 구현. threshold=5거래일. Farside Cloudflare 차단 시 `status=error` 행으로 운영 가시화.
 - **2.5-C ETF/BTC 비율 proxy** — Farside 누적 순유입(US$m) / CoinGecko BTC 시총(%)로 `etf_net_flow_btc_mcap_pct` 구현. Farside는 보유 BTC 수량이 아니라 USD flow만 제공하므로 UI 설명에 proxy 명시.
 - **프론트 메타데이터** — `frontend/src/lib/peakSignals.ts`에 2개 라벨/설명/표시순서 추가, `PeakSignals.tsx`에 `days` 단위 표시 추가.
-- **검증/적재** — `py_compile` 통과, `npm run build` 통과, 샘플 HTML parser 테스트 통과, 실제 Farside 605행 파싱 및 CoinGecko 결합 계산 통과. `POLL_ONCE=1 .venv/bin/python3 peak_signals_poller.py` 실행으로 Supabase 오늘자 16행 upsert 완료.
+- **PeakSignals 배지 줄바꿈 수정** — 스크린샷 기준 `명중` 컬럼의 `미명중` pill이 줄바꿈되는 현상 수정. 컬럼 최소 폭 72px, 배지 `inline-flex`, `whiteSpace: nowrap`, `minWidth: 48px` 적용.
+- **검증/적재/배포** — `py_compile` 통과, `npm run build` 통과, 샘플 HTML parser 테스트 통과, 실제 Farside 605행 파싱 및 CoinGecko 결합 계산 통과. `POLL_ONCE=1 .venv/bin/python3 peak_signals_poller.py` 실행으로 Supabase 오늘자 16행 upsert 완료. `gh workflow run peak-signals.yml` 실행 성공(run `26081203527`). Vercel Production deployment `success`, 운영 URL `https://crypto-monitoring-one.vercel.app/` HTTP/2 200 확인.
 
 **로컬 계산 결과 (신규 ETF 2개)**
 | 지표 | 값 | hit | 진행률 | note |
@@ -23,6 +46,12 @@
 **잔여 보류**
 - `USDT 플렉서블 세이빙` — Binance Earn 공개 페이지 스크랩 안정성 낮아 보류.
 - 기존 보류 유지 — CMC_API_KEY, CoinGlass Hobbyist 결정, 2년/4년 MA 데이터 누적.
+
+**다음 할 일**
+- CMC Pro Basic 무료 key 발급 후 `CMC_API_KEY`를 로컬 `worker/.env`와 GitHub Secret에 저장 → `altcoin_season_index` 실호출 검증.
+- 2026-05-20 이후 `peak-signals.yml` cron 02:30 UTC 자동 발화가 16행을 계속 적재하는지 1회 관측.
+- `USDT 플렉서블 세이빙`은 Binance Earn 스크랩 안정성 재평가 전까지 보류 유지.
+- CoinGlass Hobbyist 도입 여부 결정. 영구 보류 시 `.env.example`/workflow의 `COINGLASS_API_KEY` placeholder 정리.
 
 ---
 
@@ -206,8 +235,8 @@ session prop이 `App → AppShell`로, userId prop이 `AppShell → HoldingForm`
 
 ## 다음 할 일 (다음 세션 시작 시)
 
-### 누적 push — 완료 (사용자 실행, 본 세션 #3 내 발생)
-- **5 commit 적용 및 origin/main push 완료** — 로그 확인.
+### 최근 push/배포 — 완료
+- **기존 5 commit 적용 및 origin/main push 완료** — 로그 확인.
 
   | hash | 메시지 |
   |---|---|
@@ -216,14 +245,14 @@ session prop이 `App → AppShell`로, userId prop이 `AppShell → HoldingForm`
   | `9f53e1c` | `feat(frontend/chart): v5 paneIndex multi-pane RSI/MACD` |
   | `fdecd96` | `feat(stage2.5): peak_signals 14 지표 워커 + 표 UI` |
   | `8940c3d` | `docs: Stage 2.5 진행률 14/23 + 운영 안정화 반영` |
+  | `bfef5e2` | `feat(stage2.5): add ETF flow peak signals` |
+  | `11b1c82` | `fix(frontend): keep peak signal badges on one line` |
 
-- **잔여 working tree 4파일** — 본 세션 #3 갱신분(`CLAUDE.md` / `checklist.md` / `frontend/DESIGN.md` / `progress.md`)만 남음. 6번째 docs commit으로 별도 push 필요(메시지 예: `docs: 세션 #3 마감 — push 가이드 확정 + 실행 결과 반영`).
-
-### push 후 즉시 검증 (다음 세션 시작 시)
-- `gh workflow run peak-signals.yml` — cron 02:30 UTC 안 기다리고 14행 첫 적재 트리거
-- Supabase SQL `select count(*), max(captured_at) from peak_signals;` → 14 행 + 최신 UTC 확인
-- Vercel `Deployments` 첫 행이 `8940c3d` source로 Ready 확인
-- 시크릿창으로 `https://crypto-monitoring-one.vercel.app/` 6개 시각 항목 확인 (폰트/CTA/카드/뉴스 캐러셀/3단 차트/PeakSignals 14행)
+### 배포/검증 — 완료
+- `gh workflow run peak-signals.yml` — run `26081203527`, conclusion success
+- Supabase 최신 `captured_at=2026-05-19T00:00:00+00:00` → 16행 확인
+- Vercel Production deployment success, 운영 URL [crypto-monitoring-one.vercel.app](https://crypto-monitoring-one.vercel.app) HTTP/2 200
+- PeakSignals 표 16행 + `미명중`/`대기` pill 한 줄 표시 확인
 
 ### CMC key 발급 후 사용자 알림 (2.5-B0 활성화)
 - 사용자가 CMC Basic 무료 plan 키 발급 + `worker/.env`에 `CMC_API_KEY=<값>` 저장 + `gh secret set CMC_API_KEY` 후 신호 시:
@@ -231,28 +260,24 @@ session prop이 `App → AppShell`로, userId prop이 `AppShell → HoldingForm`
   - status=error면 note의 path 또는 응답 키 목록을 보고 endpoint 또는 응답 키 보정 (이미 코드가 디버깅 정보 노출 준비됨)
 
 ### CoinGlass Hobbyist 결정 (보류 상태)
-- 도입 결정 시 — Hobbyist $29/월 결제 + 키 발급 + ETF flow endpoint 확인 + `compute_etf_flow()` 통합
+- 도입 결정 시 — Hobbyist $29/월 결제 + 키 발급 + 무료 지표로 커버 못 하는 Coinglass 전용 지표 endpoint 확인 후 통합
 - 영구 보류 시 — `.env.example`의 `COINGLASS_API_KEY` placeholder 삭제 + workflow yml secret 주입 제거
 
-### push 후 즉시 수행
-- `gh workflow run peak-signals.yml` 트리거 → GitHub Actions에서 14행 첫 적재 확인 (로컬과 일치할 것)
-- Vercel 자동 배포 → prod URL [crypto-monitoring-one.vercel.app](https://crypto-monitoring-one.vercel.app)에서 시각 검증
-
-### 자동 진행 (push 후, 사용자 액션 없음)
-- `peak-signals.yml` cron 매일 02:30 UTC 자동 발화 (14 지표 일별 적재. CMC key 미발급이면 `altcoin_season_index`는 계속 insufficient_data)
-- `candle-poll.yml` 매일 누적 → `two_year_ma_multiple`이 730일 누적 시 자동 활성화 (현재 372d → 약 358일 후)
+### 자동 진행 (사용자 액션 없음)
+- `peak-signals.yml` cron 매일 02:30 UTC 자동 발화 (16 지표 일별 적재. CMC key 미발급이면 `altcoin_season_index`는 계속 insufficient_data)
+- `candle-poll.yml` 매일 누적 → `two_year_ma_multiple`이 730일 누적 시 자동 활성화 (현재 374d → 약 356일 후)
 - `news-classify.yml` cron 매시간 :15 UTC × Gemini RPD 20건 → 102건 점진 백필
 - 다른 cron 워크플로 정상 (price-poll 15분, fear-greed 01:00, candle-poll 01:15, indicators 01:30, news-poll :05, coins-catalog 02:00, news-classify :15)
 
-### 시각 검증 (사용자 브라우저, push + Vercel 배포 후)
+### 시각 검증 (운영 URL)
 - **Coinbase 디자인 전면** — 흰 캔버스 + Coinbase Blue + pill CTA 일색
-- **PeakSignals 표 14행** — 명중 0/12 + insufficient 2(2y MA, Altcoin Season) + 평균 진행률 ~42%
+- **PeakSignals 표 16행** — ok 14 + insufficient 2(2y MA, Altcoin Season), `미명중` pill 한 줄 표시
 - **HoldingForm** — datalist 자동완성
 - **ChartModal multi-pane** — 가격/RSI/MACD 세로 3단 동기 차트
 - **NewsFeed 카드 캐러셀** — 필터/그룹 + 섹션 chip + ←/→ + 한글 번역
 - 검증 쿼리(SQL Editor):
   ```sql
-  -- peak_signals 14행 확인
+  -- peak_signals 최신 16행 확인
   select signal_key, value, threshold, hit, progress_pct, status, note, captured_at
     from peak_signals order by captured_at desc, signal_key;
   -- 분류 분포

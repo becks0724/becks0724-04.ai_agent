@@ -23,6 +23,8 @@
 ### 1-A. 데이터 모델 ✓ 완료 (2026-05-16)
 - [x] Supabase `portfolio_holdings` 테이블 설계 (id, user_id, symbol, quantity, avg_buy_price, created_at, updated_at)
 - [x] Supabase `price_snapshots` 테이블 설계 (id, symbol, price_usd, fetched_at)
+- [x] Supabase `price_snapshots.price_change_24h_pct` 확장 SQL 작성 — `worker/migrations/0009_price_change_24h.sql`
+- [ ] Supabase SQL Editor에서 `0009_price_change_24h.sql` 실행 — 현재 Supabase `42703` 확인, 로컬 DB URL/psql 없음, 사용자 SQL 적용 필요
 - [x] RLS(Row Level Security) 정책 — 본인 데이터만 접근 가능하도록 설정
 - [x] 마이그레이션 SQL을 `worker/migrations/` 또는 Supabase migrations에 저장 — `worker/migrations/0001_init.sql`
 - [x] Supabase SQL Editor에서 `0001_init.sql` 실행 → 테이블·정책 생성 확인 (holdings 4 RLS policies, snapshots 1 RLS policy)
@@ -30,6 +32,9 @@
 ### 1-B. 워커 — 시세 폴링 ★ 진행 중 (배포만 남음)
 - [x] 거래소 시세 API 선택 — CoinGecko `/simple/price` (키 불필요)
 - [x] `worker/price_poller.py` 작성 — N초 간격으로 가격 조회 후 `price_snapshots`에 적재
+- [x] CoinGecko `include_24hr_change=true` 적용 — `usd_24h_change`를 `price_change_24h_pct`로 적재
+- [x] 0009 미적용 시 fallback insert — 기존 가격 적재는 유지하고 경고 로그 출력
+- [x] price-poll 1회 fallback 검증 — 0009 미적용 상태에서 `inserted=3/3`
 - [x] 폴링 주기·심볼 목록을 환경변수로 분리 — `POLL_INTERVAL_SECONDS`, `POLL_SYMBOLS`, `POLL_ONCE`
 - [x] 에러 핸들링 (rate limit 429, 네트워크 오류, 지수 백오프 2/4/8s, SIGINT/SIGTERM graceful shutdown)
 - [ ] Railway(유료) 또는 Render/Fly(무료 대안) 중 결정 후 long-running 프로세스로 배포
@@ -41,6 +46,7 @@
 - [x] 보유 자산 등록 폼 (symbol, quantity, avg_buy_price) — KRW↔USD 양방향 환산 (Frankfurter→open.er-api 폴백)
 - [x] 보유 자산 목록 조회·수정·삭제 UI (`HoldingsList.tsx`) — 인라인 수정, 삭제 확인 다이얼로그
 - [x] 최신 가격 조회 → 평가금액·손익 계산·표시 — `price_snapshots` dedupe 조회, USD/KRW 모두 표시
+- [x] 현재가 하단 24시간 등락률 표시 — 상승 빨강, 하락 파랑, 보합/데이터 없음 회색
 - [x] 가격 자동 갱신 — 30초 polling (Realtime은 Stage 5)
 
 ### 1-D. 검증
@@ -123,12 +129,12 @@
 
 ## Stage 2.5 · 강세장 정점 신호 (Bull Market Peak Signals) ★ 진행 중
 
-> **진행률 — 14 / ~23 = 60.9%** (2026-05-18 후속 #2 기준. Coinglass 30개 카탈로그 중 무료 가용 18-23개 기준)
+> **진행률 — 16 / ~23 = 69.6%** (2026-05-19 기준. Coinglass 30개 카탈로그 중 무료 가용 18-23개 기준)
 >
-> 적재 상태 (push 후 cron 매일 02:30 UTC):
-> - **status=ok** 12개 — 자체계산 5(Mayer/Pi Cycle/RSI22/AHR999/Rainbow) + 도미넌스(CoinGecko) + 온체인 4(Puell/MVRV-Z/NUPL/MVRV via bitcoin-data.com) + MSTR 2(CoinGecko treasury)
+> 적재 상태 (workflow_dispatch 검증 완료, cron 매일 02:30 UTC):
+> - **status=ok** 14개 — 자체계산 5(Mayer/Pi Cycle/RSI22/AHR999/Rainbow) + 도미넌스(CoinGecko) + 온체인 4(Puell/MVRV-Z/NUPL/MVRV via bitcoin-data.com) + ETF flow 2(Farside + CoinGecko proxy) + MSTR 2(CoinGecko treasury)
 > - **status=insufficient_data** 2개 — `two_year_ma_multiple`(730d 필요, 현재 372d) / `altcoin_season_index`(CMC_API_KEY 사용자 액션 대기)
-> - **보류** — ETF flow(CoinGlass Hobbyist $29/월 결정 보류) / Bull Market Support Band(정점 신호 부적합)
+> - **보류** — USDT Flexible Savings(Binance Earn 스크랩 안정성 낮음) / CoinGlass Hobbyist $29/월 결정 / Bull Market Support Band(정점 신호 부적합)
 >
 > 참고 페이지
 > - Coinglass `bull-market-peak-signals` (30개 카탈로그) — https://www.coinglass.com/bull-market-peak-signals
@@ -149,7 +155,7 @@
 |---|---|---|---|
 | 1 | CMC Pro Basic key 발급 + worker/.env + GitHub secret | `altcoin_season_index` insufficient_data → ok | 대기 |
 | 2 | (선택) CoinGlass Hobbyist $29/월 결제 + key | ETF flow + 추가 지표 통합 가능 | 보류 결정 |
-| 3 | (자동) candle-poll 매일 누적 ~358일 | `two_year_ma_multiple` insufficient_data → ok 자동 활성화 | 자동 진행 |
+| 3 | (자동) candle-poll 매일 누적 ~356일 | `two_year_ma_multiple` insufficient_data → ok 자동 활성화 | 자동 진행 |
 
 ### 2.5-A. 인프라 ★ 1차 구현 완료 (2026-05-18, 키 불필요 지표 3종)
 - [ ] **사용자 액션** — CoinMarketCap Pro API key 발급 (Basic 무료 plan: 30 req/min, 10,000 credits/월) — 2.5-B0 진행 시 필요
@@ -174,8 +180,8 @@
 #### 코드 (사용자 키 없이도 적재 동작)
 - [x] `fetch_cmc(path, params)` 공통 헬퍼 — `X-CMC_PRO_API_KEY` 헤더 + envelope status 검사 + 429/401/403/404 분기 처리
 - [x] `compute_altcoin_season_index(captured_at)` — `CMC_API_KEY` env 없으면 `insufficient_data` note='사용자 액션 대기'. endpoint 호출 실패 시 `error` + note에 path 노출
-- [x] run_once computations에 14번째 람다 추가
-- [x] `lib/peakSignals.ts` SIGNAL_META 추가 + DISPLAY_ORDER 14개로 확장
+- [x] run_once computations에 `altcoin_season_index` 람다 추가
+- [x] `lib/peakSignals.ts` SIGNAL_META 추가 + DISPLAY_ORDER 확장
 - [x] 드라이런 검증 (key 없는 경우) — `altcoin_season_index` row가 `status=insufficient_data`로 정상 적재 확인
 - [x] 빌드 — 610KB / gzip 179.7KB
 
@@ -230,9 +236,10 @@
 - [ ] **CBBI** (재게재) — 위 자체계산 항목과 통합.
 
 ### 2.5-E. UI / 결과 검증
-- [ ] 프론트 표 UI (스크린샷 레이아웃 참고: # / 지표 / 현재 / 기준값 / 명중 여부 / Distance to Hit / Progress)
-- [ ] 명중률 헤더 (예: "명중: X/30, 평균 진행률 Y%")
-- [ ] "매도 신호 아님 — 통계 표시 전용" 면책 문구
+- [x] 프론트 표 UI (컬럼 # / 지표 / 현재값 / 기준값 / 명중 / 진행률 / 비고)
+- [x] 명중률 헤더 (명중 X/Y, 평균 진행률)
+- [x] "통계 표시 전용 · 매매 신호 아님" 면책 문구
+- [x] `미명중`/`대기`/`오류` pill 한 줄 표시 보정 (컬럼 최소 폭 + `whiteSpace: nowrap`)
 - [ ] 과거 데이터 차트 (소형 sparkline 또는 상세 모달)
 
 > 예상 구현 가능 범위 — CMC API(2.5-B0) 2-3개 + 자체 계산(2.5-B1) 13개 + 외부 페이지(2.5-C) 4개 + 온체인 무료(2.5-D 일부) 1-3개 = **약 20-23개 / 30개**. 나머지는 N/A 표시.
@@ -324,22 +331,21 @@
 - [x] `8940c3d docs: Stage 2.5 진행률 14/23 + 운영 안정화 반영` (3 파일)
 - [x] `git push origin main` — `Your branch is up to date with 'origin/main'` 확인
 
-### 잔여 — 다음 세션에서 마무리
-- [ ] 본 세션 #3 4 문서 갱신분(`CLAUDE.md` / `checklist.md` / `frontend/DESIGN.md` / `progress.md`) 6번째 docs commit으로 push (메시지 예: `docs: 세션 #3 마감 — push 가이드 확정 + 실행 결과 반영`)
-
-### push 후 즉시 검증 (사용자 실행 대기)
-- [ ] `gh workflow run peak-signals.yml` — cron 02:30 UTC 안 기다리고 14행 첫 적재 트리거
-- [ ] Supabase SQL `select count(*), max(captured_at) from peak_signals;` → 14 + 최신 UTC 확인
-- [ ] Vercel `Deployments` 첫 행이 `8940c3d` source로 Ready 확인 (1~2분)
+### 2026-05-19 추가 배포/검증 완료
+- [x] `bfef5e2 feat(stage2.5): add ETF flow peak signals` — Farside ETF flow 2 지표 + UI 메타데이터 + 문서 갱신
+- [x] `11b1c82 fix(frontend): keep peak signal badges on one line` — `미명중` 배지 줄바꿈 수정
+- [x] `gh workflow run peak-signals.yml` — run `26081203527`, conclusion success
+- [x] Supabase 최신 `captured_at=2026-05-19T00:00:00+00:00` 기준 16행 확인
+- [x] Vercel Production deployment success + 운영 URL HTTP/2 200 확인
 
 ### 시각 검증 (시크릿창 권장, 캐시 회피)
-- [ ] `https://crypto-monitoring-one.vercel.app/` 시크릿창 (Cmd+Shift+N)
-- [ ] 폰트 — 본문 Inter, 숫자 JetBrains Mono
-- [ ] CTA — Coinbase Blue `#0052ff` pill (radius 100px)
-- [ ] 카드 — 흰 배경 + 1px hairline + 24px radius
-- [ ] 뉴스 — 카드 캐러셀 + ←/→ + 한국어 제목 (영문 작은 회색 이탤릭)
-- [ ] 차트 모달 — 가격/RSI(30·70 점선)/MACD(line+Signal+Histogram) 3단 세로
-- [ ] PeakSignals 표 — 14행, 12 진행률 막대 + 2 회색 "데이터 부족"
+- [x] `https://crypto-monitoring-one.vercel.app/` 운영 URL 응답 정상
+- [x] 폰트 — 본문 Inter, 숫자 JetBrains Mono
+- [x] CTA — Coinbase Blue `#0052ff` pill (radius 100px)
+- [x] 카드 — 흰 배경 + 1px hairline + 24px radius
+- [x] 뉴스 — 카드 캐러셀 + ←/→ + 한국어 제목 (영문 작은 회색 이탤릭)
+- [x] 차트 모달 — 가격/RSI(30·70 점선)/MACD(line+Signal+Histogram) 3단 세로
+- [x] PeakSignals 표 — 16행, `미명중`/`대기` 배지 한 줄 표시, 14 ok + 2 insufficient_data
 
 ### 트러블슈팅
 - Vercel 빌드 실패 — `Deployments` 행 클릭 → `View Build Logs`로 에러 확인. 로컬 `npm run build` 통과 후 push했으면 거의 안 생김.
@@ -415,7 +421,7 @@
 - [x] AppShell — 포트폴리오 ↔ PeakSignals ↔ 뉴스 순서
 - [x] **BTC 캔들 365일 백필** — `gh workflow run candle-poll.yml -f days=365` 실행 → 371행 (2025-05-19 ~ 2026-05-18)
 - [x] **로컬 첫 적재 검증** — 3 지표 모두 status=ok. btc_dominance 58.19% / mayer_multiple 0.9538 (hit=False, 39.74%) / pi_cycle_top 0.3832 (hit=False, 38.32%)
-- [ ] **push 후 GitHub Actions workflow_dispatch 검증** — push 보류로 미진행. push 시 즉시 가능
+- [x] **GitHub Actions workflow_dispatch 검증** — run `26081203527` success, 최신 16행 적재 확인
 - [ ] **자동 진행 — peak-signals cron 매일 02:30 UTC 발화 관측**
 
 ### 2.5-B1 자체계산 확장 ✓ 완료 (2026-05-18 후속)

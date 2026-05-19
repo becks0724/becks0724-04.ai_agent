@@ -41,13 +41,14 @@ def _request_shutdown(signum: int, _frame) -> None:
     print(f"[poller] received signal {signum}, will exit after current loop", flush=True)
 
 
-def _fetch_prices_single(coingecko_ids: list[str]) -> dict[str, float]:
+def _fetch_prices_single(coingecko_ids: list[str]) -> dict[str, dict[str, float | None]]:
     """CoinGecko /simple/price 한 번 호출. 한도(~250 id) 안에서만 사용한다."""
     if not coingecko_ids:
         return {}
     params = {
         "ids": ",".join(coingecko_ids),
         "vs_currencies": "usd",
+        "include_24hr_change": "true",
     }
     last_exc: Exception | None = None
     for attempt in range(1, MAX_RETRIES + 1):
@@ -61,11 +62,16 @@ def _fetch_prices_single(coingecko_ids: list[str]) -> dict[str, float]:
                     continue
                 resp.raise_for_status()
                 data = resp.json()
-            out: dict[str, float] = {}
+            out: dict[str, dict[str, float | None]] = {}
             for cg_id, payload in data.items():
                 usd = payload.get("usd")
                 if isinstance(usd, (int, float)):
-                    out[cg_id] = float(usd)
+                    raw_change = payload.get("usd_24h_change")
+                    change = float(raw_change) if isinstance(raw_change, (int, float)) else None
+                    out[cg_id] = {
+                        "price_usd": float(usd),
+                        "price_change_24h_pct": change,
+                    }
             return out
         except (httpx.HTTPError, ValueError) as e:
             last_exc = e
@@ -76,11 +82,11 @@ def _fetch_prices_single(coingecko_ids: list[str]) -> dict[str, float]:
     return {}
 
 
-def fetch_prices(coingecko_ids: list[str], chunk_size: int = 250) -> dict[str, float]:
+def fetch_prices(coingecko_ids: list[str], chunk_size: int = 250) -> dict[str, dict[str, float | None]]:
     """id 수가 많으면 chunk_size 단위로 분할 호출. chunk간 1초 sleep."""
     if not coingecko_ids:
         return {}
-    out: dict[str, float] = {}
+    out: dict[str, dict[str, float | None]] = {}
     for i in range(0, len(coingecko_ids), chunk_size):
         chunk = coingecko_ids[i:i + chunk_size]
         out.update(_fetch_prices_single(chunk))
@@ -92,19 +98,21 @@ def fetch_prices(coingecko_ids: list[str], chunk_size: int = 250) -> dict[str, f
 def insert_snapshots(
     supabase: Client,
     symbol_to_cg: dict[str, str],
-    cg_to_price: dict[str, float],
+    cg_to_price: dict[str, dict[str, float | None]],
 ) -> int:
     """symbol별 가격을 price_snapshots에 일괄 insert. 적재된 행 수 반환."""
     rows: list[dict] = []
     fetched_at = datetime.now(timezone.utc).isoformat()
     for symbol, cg_id in symbol_to_cg.items():
-        price = cg_to_price.get(cg_id)
-        if price is None:
+        price_info = cg_to_price.get(cg_id)
+        if price_info is None:
             print(f"[poller] WARN no price for {symbol} (id={cg_id})", flush=True)
             continue
+        price = price_info["price_usd"]
         rows.append({
             "symbol": symbol,
             "price_usd": price,
+            "price_change_24h_pct": price_info.get("price_change_24h_pct"),
             "fetched_at": fetched_at,
         })
     if not rows:
@@ -113,6 +121,22 @@ def insert_snapshots(
         supabase.table("price_snapshots").insert(rows).execute()
         return len(rows)
     except Exception as e:
+        if "price_change_24h_pct" in repr(e):
+            print(
+                "[poller] WARN price_change_24h_pct column missing; "
+                "retry insert without 24h change (run migration 0009)",
+                flush=True,
+            )
+            fallback_rows = [
+                {k: v for k, v in row.items() if k != "price_change_24h_pct"}
+                for row in rows
+            ]
+            try:
+                supabase.table("price_snapshots").insert(fallback_rows).execute()
+                return len(fallback_rows)
+            except Exception as fallback_e:
+                print(f"[poller] supabase fallback insert error: {fallback_e!r}", flush=True)
+                return 0
         print(f"[poller] supabase insert error: {e!r}", flush=True)
         return 0
 

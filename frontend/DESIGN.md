@@ -478,6 +478,8 @@ Pill for interactive, card-radius (24px) for containers, full circle for icons. 
 
 **`asset-row`** — Horizontal row in asset lists (Explore, Wealth). Background transparent, 1px hairline divider. Layout: 32px circular asset icon left, asset name + ticker, price column in `{typography.number-display}`, 24h change column with `{component.price-up-cell}` or `{component.price-down-cell}`.
 
+**`holding-price-cell`** — HoldingsList 현재가 컬럼 변형. 상단은 현재가(USD) `15px` number font, 하단은 24h 등락률 `12px` number font. 색상은 한국식 금융 규칙으로 상승 `#cf202f`, 하락 `#0052ff`, 보합/데이터 없음 `#5b616e`. 두 줄 간격은 4px.
+
 **`price-up-cell`** + **`price-down-cell`** — Inline price-change cells. Color only — green or red text in `{typography.number-display}`, no background fill.
 
 **`asset-icon-circular`** — Circular plate behind asset glyphs. Background `{colors.surface-strong}`, rounded `{rounded.full}`, 32px diameter.
@@ -636,7 +638,8 @@ YAML 토큰 → CSS variable 1:1 매핑:
 - **진행률 막대 (progress bar)** — 트랙 `surface-strong` 6px 높이 pill, 채움 `primary #0052ff` 또는 명중 시 `semantic-down #cf202f`. 0~100% clamp.
 - **요약 카드** — 흰 카드 안 회색 `surface-soft` 16px radius 보조 카드. 명중/평균 진행률 두 메트릭을 mono 폰트로 강조 (Coinbase 가격 카드와 동일 패턴).
 - **status 컬러 규칙** — `insufficient_data` 행의 value 셀은 `muted-soft #a8acb3` (대기 의미). `error` 행도 동일 회색 처리. ok 명중 시에만 value 셀이 `semantic-down`으로 변하는 정점 신호 시각 위계.
-- **단위 변형** — `unit` 타입 4종을 클라이언트 `formatValue()`에 두기. `%`(BTC 도미넌스 / RSI / 진행률), `band`(Rainbow Chart `N / 7`), `BTC`(MSTR 보유 `818,869 BTC` 콤마 포맷), 기본 무차원(`0.9551` 등 가변 정밀도).
+- **단위 변형** — `unit` 타입 5종을 클라이언트 `formatValue()`에 두기. `%`(BTC 도미넌스 / RSI / ETF flow ratio / 진행률), `band`(Rainbow Chart `N / 7`), `BTC`(MSTR 보유 `818,869 BTC` 콤마 포맷), `days`(ETF 순유출 연속일), 기본 무차원(`0.9551` 등 가변 정밀도).
+- **명중 배지 폭 규칙** — `명중` 컬럼은 최소 72px, pill은 `inline-flex`, `white-space: nowrap`, `min-width: 48px`. `미명중`이 좁은 뷰포트나 표 폭 변화에서 줄바꿈되지 않아야 한다.
 
 ### 라이트 톤 변형 (원본 미정의)
 
@@ -683,3 +686,9 @@ negative  bg=#fee2e2 fg=#cf202f   (semantic-down의 lightened)
 - 본 세션은 push 가이드 안내 + 사용자 실행. 디자인 토큰·컴포넌트 매핑 변경 0.
 - 본 DESIGN.md는 commit `e38895b feat(frontend): Coinbase 디자인 토큰 전면 적용`에 포함되어 origin/main에 처음 올라감(사용자 실행 확인). Vercel webhook 자동 발화로 prod 첫 반영.
 - 본 footer는 그 후 추가 갱신된 부분이므로 다음 docs commit으로 별도 push 필요.
+
+### 2026-05-19 후속
+- Stage 2.5-C ETF flow 2개 지표 추가로 PeakSignals 표시 행이 16개로 확장됨. `etf_outflow_streak`는 `days`, `etf_net_flow_btc_mcap_pct`는 `%` 단위.
+- `미명중` 배지 줄바꿈 이슈 수정. 표의 `명중` 컬럼과 pill 최소 폭/nowrap 규칙을 디자인 토큰 운용 규칙으로 고정.
+- 배포 커밋: `bfef5e2 feat(stage2.5): add ETF flow peak signals`, `11b1c82 fix(frontend): keep peak signal badges on one line`.
+- HoldingsList 현재가 하단 24h 등락률 표시 규칙 추가. 상승=빨강, 하락=파랑, 보합/null=회색.
