@@ -480,6 +480,8 @@ Pill for interactive, card-radius (24px) for containers, full circle for icons. 
 
 **`holding-price-cell`** — HoldingsList 현재가 컬럼 변형. 상단은 현재가(USD) `15px` number font, 하단은 24h 등락률 `12px` number font. 색상은 한국식 금융 규칙으로 상승 `#cf202f`, 하락 `#0052ff`, 보합/데이터 없음 `#5b616e`. 두 줄 간격은 4px.
 
+**`header-market-pill`** — AppShell 헤더의 시장 지표 pill. `Fear & Greed`와 `Altcoin Season`은 동일한 `surface-strong #eef0f3`, radius 100px, 13px 텍스트, 6px gap을 공유한다. 값은 number font, `Altcoin Season` 대기 상태는 Coinbase Blue `#0052ff`.
+
 **`price-up-cell`** + **`price-down-cell`** — Inline price-change cells. Color only — green or red text in `{typography.number-display}`, no background fill.
 
 **`asset-icon-circular`** — Circular plate behind asset glyphs. Background `{colors.surface-strong}`, rounded `{rounded.full}`, 32px diameter.
@@ -692,3 +694,4 @@ negative  bg=#fee2e2 fg=#cf202f   (semantic-down의 lightened)
 - `미명중` 배지 줄바꿈 이슈 수정. 표의 `명중` 컬럼과 pill 최소 폭/nowrap 규칙을 디자인 토큰 운용 규칙으로 고정.
 - 배포 커밋: `bfef5e2 feat(stage2.5): add ETF flow peak signals`, `11b1c82 fix(frontend): keep peak signal badges on one line`.
 - HoldingsList 현재가 하단 24h 등락률 표시 규칙 추가. 상승=빨강, 하락=파랑, 보합/null=회색.
+- 헤더에 Altcoin Season Index pill 추가. CMC key 대기 상태는 `대기`로 표시.

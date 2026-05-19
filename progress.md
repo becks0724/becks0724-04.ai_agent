@@ -9,6 +9,7 @@
 **한 줄 요약** — `현재가 (USD)` 셀 하단에 CoinGecko 24시간 등락률을 표시하는 기능을 구현 중. `price_snapshots.price_change_24h_pct` nullable 컬럼용 `0009` 마이그레이션 추가, `price_poller.py`가 `/simple/price?include_24hr_change=true` 응답의 `usd_24h_change`를 저장하도록 확장, 프론트 `HoldingsList`는 현재가 아래 `+/-N.NN%`를 표시한다. 색상은 한국식 규칙으로 상승 빨강(`#cf202f`), 하락 파랑(`#0052ff`), 보합/데이터 없음 회색(`#5b616e`).
 
 **본 세션 산출**
+- **상단 Altcoin Season Index 배지** — `frontend/src/components/AppShell.tsx` 헤더의 Fear & Greed 옆에 `altcoin_season_index` 최신값을 표시. CMC key 미발급 상태(`insufficient_data`)는 `Altcoin Season 대기`로 표시하고 tooltip에 note를 노출.
 - **현재가 24h 등락률 표시** — `frontend/src/components/HoldingsList.tsx` 현재가 셀을 2줄로 변경. 상단 현재가, 하단 24h 등락률. null이면 `—` 표시.
 - **시세 스키마 확장** — `worker/migrations/0009_price_change_24h.sql` 추가. `price_change_24h_pct numeric(12, 6)` nullable 컬럼.
 - **시세 워커 확장** — `worker/price_poller.py`가 CoinGecko `include_24hr_change=true`를 요청하고 `usd_24h_change`를 저장. 0009 미적용 환경에서는 경고 후 기존 컬럼만 fallback insert.

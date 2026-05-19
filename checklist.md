@@ -47,6 +47,7 @@
 - [x] 보유 자산 목록 조회·수정·삭제 UI (`HoldingsList.tsx`) — 인라인 수정, 삭제 확인 다이얼로그
 - [x] 최신 가격 조회 → 평가금액·손익 계산·표시 — `price_snapshots` dedupe 조회, USD/KRW 모두 표시
 - [x] 현재가 하단 24시간 등락률 표시 — 상승 빨강, 하락 파랑, 보합/데이터 없음 회색
+- [x] 상단 헤더 Altcoin Season Index 배지 추가 — CMC key 대기 시 `Altcoin Season 대기` 표시
 - [x] 가격 자동 갱신 — 30초 polling (Realtime은 Stage 5)
 
 ### 1-D. 검증

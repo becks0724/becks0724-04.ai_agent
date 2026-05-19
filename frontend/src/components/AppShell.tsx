@@ -10,6 +10,8 @@ import { fetchLatestPrices } from '../lib/prices'
 import type { PriceSnapshot } from '../lib/prices'
 import { fetchLatestFearGreed } from '../lib/fearGreed'
 import type { FearGreed } from '../lib/fearGreed'
+import { fetchLatestPeakSignals } from '../lib/peakSignals'
+import type { PeakSignal } from '../lib/peakSignals'
 import { normalizeError } from '../lib/errors'
 import { HoldingForm } from './HoldingForm'
 import { HoldingsList } from './HoldingsList'
@@ -39,6 +41,7 @@ export function AppShell() {
 
   // fear & greed (일 1회 갱신이라 마운트 시 1회만 조회. 사용자는 새로고침으로 최신화 가능)
   const [fearGreed, setFearGreed] = useState<FearGreed | null>(null)
+  const [altcoinSeason, setAltcoinSeason] = useState<PeakSignal | null>(null)
 
   // 환율 1회 로드 + 수동 새로고침
   const loadFx = useCallback(async () => {
@@ -50,6 +53,22 @@ export function AppShell() {
       setFxError(normalizeError(e).message)
     } finally {
       setFxLoading(false)
+    }
+  }, [])
+
+  // 헤더용 Altcoin Season Index. 실패해도 핵심 화면에는 영향 없게 silent.
+  useEffect(() => {
+    let mounted = true
+    fetchLatestPeakSignals()
+      .then((rows) => {
+        if (!mounted) return
+        setAltcoinSeason(rows.find((row) => row.signalKey === 'altcoin_season_index') ?? null)
+      })
+      .catch(() => {
+        // CMC 키 미발급/지표 미적재 상태는 PeakSignals 표에서 상세히 보인다.
+      })
+    return () => {
+      mounted = false
     }
   }, [])
   useEffect(() => {
@@ -127,8 +146,19 @@ export function AppShell() {
         <div style={styles.headerInner}>
           <div style={styles.brand}>crypto-monitoring</div>
           <div style={styles.right}>
+            {altcoinSeason && (
+              <div
+                style={styles.marketPill}
+                title={`기준일 ${altcoinSeason.capturedAt.slice(0, 10)}${altcoinSeason.note ? ` · ${altcoinSeason.note}` : ''}`}
+              >
+                <span style={styles.fgLabel}>Altcoin Season</span>
+                <span style={{ ...styles.fgValue, color: altcoinSeasonColor(altcoinSeason) }}>
+                  {formatAltcoinSeason(altcoinSeason)}
+                </span>
+              </div>
+            )}
             {fearGreed && (
-              <div style={styles.fearGreed} title={`기준일 ${fearGreed.capturedAt.slice(0, 10)}`}>
+              <div style={styles.marketPill} title={`기준일 ${fearGreed.capturedAt.slice(0, 10)}`}>
                 <span style={styles.fgLabel}>Fear &amp; Greed</span>
                 <span style={{ ...styles.fgValue, color: fgColor(fearGreed.classification) }}>
                   {fearGreed.value}
@@ -281,6 +311,19 @@ function fgColor(classification: string): string {
   }
 }
 
+function formatAltcoinSeason(signal: PeakSignal): string {
+  if (signal.status === 'insufficient_data') return '대기'
+  if (signal.status === 'error') return '오류'
+  return signal.value === null ? '—' : signal.value.toFixed(0)
+}
+
+function altcoinSeasonColor(signal: PeakSignal): string {
+  if (signal.status === 'insufficient_data') return '#0052ff'
+  if (signal.status === 'error') return '#cf202f'
+  if (signal.hit) return '#cf202f'
+  return '#5b616e'
+}
+
 const numberFont = "'JetBrains Mono', ui-monospace, 'SF Mono', Consolas, monospace"
 
 const styles: Record<string, React.CSSProperties> = {
@@ -307,7 +350,7 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#0052ff',
     letterSpacing: '-0.2px',
   },
-  fearGreed: {
+  marketPill: {
     display: 'inline-flex',
     alignItems: 'baseline',
     gap: '6px',
