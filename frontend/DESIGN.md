@@ -674,3 +674,12 @@ negative  bg=#fee2e2 fg=#cf202f   (semantic-down의 lightened)
 - 원본 다크 hero band(`hero-band-dark` / `cta-band-dark`)는 본 앱에 도입하지 않는다 — 인앱 대시보드 톤과 충돌.
 - 단일 voltage 규칙 예외(RSI 보라 등)는 보조 식별 목적의 차트 시리즈에만 허용. CTA에는 절대 Blue 외 사용 금지.
 - 신규 UI에 다크 배경(`#0b0d10` 등 이전 다크 톤)을 부활시키지 않는다 — 이전 세션에서 다크 → 흰 캔버스 전환을 명시적으로 끝냈다.
+
+---
+
+## 세션 노트
+
+### 2026-05-18 후속 #3
+- 본 세션은 push 가이드 안내 + 사용자 실행. 디자인 토큰·컴포넌트 매핑 변경 0.
+- 본 DESIGN.md는 commit `e38895b feat(frontend): Coinbase 디자인 토큰 전면 적용`에 포함되어 origin/main에 처음 올라감(사용자 실행 확인). Vercel webhook 자동 발화로 prod 첫 반영.
+- 본 footer는 그 후 추가 갱신된 부분이므로 다음 docs commit으로 별도 push 필요.

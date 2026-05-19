@@ -165,7 +165,7 @@ function Row({ idx, sig }: { idx: number; sig: PeakSignal }) {
 
 function formatValue(
   v: number | null,
-  unit: '%' | '' | 'band' | 'BTC' | undefined,
+  unit: '%' | '' | 'band' | 'BTC' | 'days' | undefined,
   isThreshold = false,
 ): string {
   if (v === null) return '—'
@@ -175,6 +175,7 @@ function formatValue(
     if (isThreshold) return '—'
     return `${Math.round(v).toLocaleString('en-US')} BTC`
   }
+  if (unit === 'days') return `${v.toFixed(0)}일`
   // 무차원 비율 — 값 크기에 따라 정밀도 가변.
   const abs = Math.abs(v)
   if (abs >= 100) return v.toFixed(2)

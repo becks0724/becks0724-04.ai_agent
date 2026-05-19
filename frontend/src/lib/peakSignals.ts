@@ -19,7 +19,7 @@ export type PeakSignal = {
 // signal_key → 한국어 라벨 + 설명 + 표시 단위. 워커가 적재하는 키에 맞춰 갱신.
 export const SIGNAL_META: Record<
   string,
-  { label: string; desc: string; unit?: '%' | '' | 'band' | 'BTC' }
+  { label: string; desc: string; unit?: '%' | '' | 'band' | 'BTC' | 'days' }
 > = {
   btc_dominance: {
     label: 'BTC 도미넌스',
@@ -67,6 +67,16 @@ export const SIGNAL_META: Record<
     label: 'MVRV Ratio',
     desc: '시총 / Realized Cap. 3.7 이상은 정점 영역.',
   },
+  etf_outflow_streak: {
+    label: 'ETF 순유출 연속일',
+    desc: '미국 spot BTC ETF 총 flow가 연속 순유출인 거래일 수. 5일 이상이면 수요 약화 신호.',
+    unit: 'days',
+  },
+  etf_net_flow_btc_mcap_pct: {
+    label: 'ETF/BTC Flow 비율',
+    desc: 'Farside 누적 spot BTC ETF 순유입 / CoinGecko BTC 시총(%). 보유 BTC 비율이 아닌 flow proxy.',
+    unit: '%',
+  },
   mstr_btc_holdings: {
     label: 'Strategy BTC 보유',
     desc: 'Strategy Inc(구 MicroStrategy)의 BTC 보유 수량. 정보성 지표 (명중 임계 없음).',
@@ -97,6 +107,8 @@ const DISPLAY_ORDER = [
   'nupl',
   'mvrv_ratio',
   // 2.5-C 합법 무료 (CoinGecko 상장사 treasury)
+  'etf_outflow_streak',
+  'etf_net_flow_btc_mcap_pct',
   'mstr_btc_holdings',
   'mstr_pnl_ratio',
   // 2.5-B0 CMC 공식 API (사용자 key 발급 시 활성화)

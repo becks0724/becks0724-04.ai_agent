@@ -4,7 +4,7 @@
 크립토 포트폴리오 모니터링과 뉴스·지표 대시보드를 제공하는 웹 애플리케이션이다.
 사용자는 수동으로 보유 자산을 입력하고, 실시간 시세·기술적 지표·뉴스 감성을 한 화면에서 확인한다.
 
-## 현재 단계 (2026-05-18 후속 #2 세션 기준)
+## 현재 단계 (2026-05-19 후속 세션 기준)
 - **Stage 0 완료** — Git/스캐폴드/GitHub(`becks0724/becks0724-04.ai_agent` **public**)/Supabase(Singapore)/Vercel(`crypto-monitoring-one.vercel.app`) 검증 완료.
 - **Stage 1 MVP 완료** — `portfolio_holdings`, `price_snapshots`, RLS 4+1, 워커 시세 폴러, 프론트 CRUD, 검증 모두 통과.
 - **auth 리팩토링 완료** — `AuthProvider` Context 패턴, signOut/error 노출, env explicit throw.
@@ -14,13 +14,14 @@
 - **Stage 4 LLM 분류** — Gemini 2.5 Flash-Lite, RPD 20 한도. 약 34/102 적재, cron 점진 백필.
 - **Coinbase 디자인 적용 완료** — `frontend/DESIGN.md` 토큰 사양서 + Inter/JetBrains Mono + 흰 캔버스 + 단일 voltage `#0052ff` + pill 100px + xl 24px. 6개 컴포넌트(Login/AppShell/HoldingForm/HoldingsList/NewsFeed/ChartModal) 리스킨. PeakSignals 신규 컴포넌트도 동일 토큰으로 적용.
 - **NewsFeed 카드 캐러셀 + 한글 번역** — 섹션 chip(감성/카테고리/종목/시간순) 점프 + ←/→ 순환 + N/M 카운터. MyMemory 무료 번역(localStorage 영구 캐시, 인접 prefetch). 영문 원본은 작은 회색 이탤릭 보조.
-- **Stage 2.5 진행 중 (14 / ~23 = 60.9%)** — `peak_signals` 테이블 + 워커 + cron 02:30 UTC + 프론트 표 UI. 14개 지표 로컬 적재 검증:
-  - **status=ok 12** — 자체계산 5(Mayer/Pi Cycle/RSI22/AHR999/Rainbow) + 도미넌스(CoinGecko) + 온체인 4(Puell/MVRV-Z/NUPL/MVRV via bitcoin-data.com) + MSTR 2(CoinGecko `/companies/public_treasury/bitcoin`)
+- **Stage 2.5 진행 중 (16 / ~23 = 69.6%)** — `peak_signals` 테이블 + 워커 + cron 02:30 UTC + 프론트 표 UI. 16개 지표 로컬 적재 검증:
+  - **status=ok 14** — 자체계산 5(Mayer/Pi Cycle/RSI22/AHR999/Rainbow) + 도미넌스(CoinGecko) + 온체인 4(Puell/MVRV-Z/NUPL/MVRV via bitcoin-data.com) + ETF flow 2(Farside + CoinGecko proxy) + MSTR 2(CoinGecko `/companies/public_treasury/bitcoin`)
   - **status=insufficient_data 2** — `two_year_ma_multiple`(730d 필요, 현 372d, candle-poll 누적으로 자동 활성화) / `altcoin_season_index`(CMC_API_KEY 사용자 액션 대기)
-  - **보류** — ETF flow(CoinGlass Hobbyist $29/월 결정 보류) / Bull Market Support Band(정점 신호 부적합)
+  - **보류** — USDT Flexible Savings(Binance Earn 스크랩 안정성 낮음) / CoinGlass Hobbyist $29/월 결정 / Bull Market Support Band(정점 신호 부적합)
 - **운영 안정화** — bitcoin-data.com 분당 한도(60s cooldown) 대응 — 첫 retry 60초 fixed sleep + upsert 가드(`status='error'`는 같은 captured_at에 ok 행 있으면 skip).
 - **워커 호스팅** — GitHub Actions cron **8개 워크플로** (price-poll 15분, fear-greed 01:00, candle-poll 01:15, indicators 01:30, news-poll 매시간 :05, coins-catalog 02:00, news-classify 매시간 :15, **peak-signals 02:30**). peak-signals.yml은 push 보류로 main 미발화 — push 시 자동 발화.
-- **다음 본 작업** — 누적 변경 push 결정 → CMC Pro Basic key 발급(2.5-B0 활성화) → 추가 확장(CoinGlass 결정 / Stage 5 실시간화).
+- **누적 push 완료 (세션 #3)** — 사용자가 5 commit 분할 가이드 그대로 실행 → `e38895b`(Coinbase 디자인 8) / `bc09ef1`(NewsFeed 캐러셀 3) / `9f53e1c`(ChartModal 1) / `fdecd96`(Stage 2.5 peak_signals 6) / `8940c3d`(docs 3) 5개 모두 origin/main 적용. Vercel webhook 자동 발화로 prod에 첫 반영. peak-signals.yml도 main에 올라가 cron 매일 02:30 UTC 자동 발화 시작. 본 세션 #3 코드 변경 0건(가이드만), 4 문서 갱신분만 working tree 잔여.
+- **다음 본 작업** — 2.5-C ETF flow 변경분 commit·push → Vercel Ready 확인 + 시각 검증 → `gh workflow run peak-signals.yml` 트리거로 GitHub Actions 16행 적재 검증 → CMC Pro Basic key 발급(2.5-B0 활성화) → 추가 확장(CoinGlass 결정 / Stage 5 실시간화).
 - 세부 진행 사항은 `progress.md`, 작업 단위 체크리스트는 `checklist.md`, 디자인 토큰은 `frontend/DESIGN.md`.
 
 ## 기술 스택

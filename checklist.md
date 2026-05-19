@@ -194,34 +194,34 @@
   - `status=error note="response keys: [...]"` → endpoint OK, value 키 이름 다름. note의 키 목록으로 코드 보정.
 
 ### 2.5-B1. CoinGecko 가격으로 자체 계산 (CMC API에 없을 때 폴백·또는 무료 유지)
-- [ ] **AHR999 지수** — `BTC / 200d_geomean_MA × growth_factor` (대략).
-- [ ] **AHR999x 고점 회피** — AHR999 변형.
-- [ ] **Pi Cycle Top** — `111dMA` vs `350dMA × 2` 교차.
-- [ ] **2년 MA 배수** — `price / 2yMA`.
+- [x] **AHR999 지수** — `BTC / 200d_geomean_MA × growth_factor` (대략). `ahr999` 구현 완료.
+- [ ] **AHR999x 고점 회피** — AHR999 변형. 정의 확정 후 진행.
+- [x] **Pi Cycle Top** — `111dMA` vs `350dMA × 2` 교차. `pi_cycle_top` 구현 완료.
+- [x] **2년 MA 배수** — `price / 2yMA`. `two_year_ma_multiple` skeleton 구현 완료, 730일 데이터 누적 전까지 `insufficient_data`.
 - [ ] **4년(1460d) 이동평균선** — `price / 1460dMA` *(CoinGecko 무료 365일 한도 → 워커가 매일 종가 적재 후 누적 5년치 직접 보유 필요)*.
-- [ ] **Mayer Multiple** — `price / 200dMA`.
-- [ ] **레인보우 차트** — 로그 회귀 밴드 (오픈소스 회귀식 사용).
-- [ ] **RSI 22일** — 일봉 종가 기반 RSI 계산.
-- [ ] **비트코인 도미넌스** — CoinGecko `/global` API 직접.
-- [ ] **골든 레이쇼 멀티플라이어** — `price / 350dMA × ratio`.
+- [x] **Mayer Multiple** — `price / 200dMA`. `mayer_multiple` 구현 완료.
+- [x] **레인보우 차트** — 로그 회귀 밴드 (오픈소스 회귀식 사용). `rainbow_band` 구현 완료.
+- [x] **RSI 22일** — 일봉 종가 기반 RSI 계산. `btc_rsi_22` 구현 완료.
+- [x] **비트코인 도미넌스** — CoinGecko `/global` API 직접. `btc_dominance` 구현 완료.
+- [ ] **골든 레이쇼 멀티플라이어** — `price / 350dMA × ratio`. 회귀/ratio 정의 확정 후 진행.
 - [ ] **CBBI** — 여러 하위 지표 가중평균 (자체 정의 필요).
 - [ ] **Smithson의 예측** — 175k~230k 범위 비교 (단순 임계값).
 - [ ] **비트코인 트렌드 지표** — 정의 불명확. 정의 확정 후 구현.
 
 ### 2.5-C. 무료 외부 페이지에서 스크랩/수집 가능
-- [ ] **ETF 순유출 일수** — Farside/SoSoValue 공개 페이지. 일일 ETF flow CSV.
-- [ ] **ETF/BTC 비율** — 누적 ETF 보유 BTC / 총 공급량. Farside 데이터로 계산.
-- [ ] **MicroStrategy 평균 매입 단가** — Saylortracker 또는 공시 데이터.
+- [x] **ETF 순유출 일수** — Farside 공개 BTC ETF flow 표 파서 + `etf_outflow_streak` 구현 완료. Cloudflare 차단 시 `status=error`로 운영 가시화.
+- [x] **ETF/BTC 비율** — Farside 누적 순유입 / CoinGecko BTC 시총 proxy로 `etf_net_flow_btc_mcap_pct` 구현 완료. Farside는 보유 BTC 수량이 아니라 USD flow만 제공하므로 UI 설명에 proxy 명시.
+- [x] **MicroStrategy 평균 매입 단가/손익 대체 지표** — Saylortracker/SEC 직접 파싱 대신 CoinGecko public treasury로 `mstr_btc_holdings`, `mstr_pnl_ratio` 구현 완료.
 - [ ] **USDT 플렉서블 세이빙** — Binance Earn 공개 페이지 (스크랩 안정성 ★ 낮음).
 
 ### 2.5-D. 온체인 데이터 필요 — 무료 한도 안에서 가능한 것만 (보류 가능성 ★)
 > 무료 대안 후보 — `mempool.space` (UTXO 통계), `Blockchain.com Charts`, `CoinMetrics community` (일부 무료), `bitcoin-data.com` API.
-- [ ] **Puell Multiple** — 일일 발행량 × 가격 / 365d 평균. `bitcoin-data.com` 또는 `mempool.space` + CoinGecko 조합 가능.
-- [ ] **MVRV Z-Score** — Market cap vs Realized cap. `bitcoin-data.com` 무료 가능.
-- [ ] **NUPL (미실현 손익)** — Realized cap 필요. `bitcoin-data.com` 가능.
+- [x] **Puell Multiple** — 일일 발행량 × 가격 / 365d 평균. `bitcoin-data.com` 구현 완료.
+- [x] **MVRV Z-Score** — Market cap vs Realized cap. `bitcoin-data.com` 구현 완료.
+- [x] **NUPL (미실현 손익)** — Realized cap 필요. `bitcoin-data.com` 구현 완료.
 - [ ] **RHODL 비율** — Glassnode 의존. 무료 대안 부재. **보류**.
 - [ ] **Reserve Risk** — Glassnode 의존. **보류**.
-- [ ] **MVRV 비율** — `bitcoin-data.com` 가능.
+- [x] **MVRV 비율** — `bitcoin-data.com` 구현 완료.
 - [ ] **LTH Supply / STH Supply%** — Glassnode 의존. **보류**.
 - [ ] **Bitcoin Macro Oscillator (BMO)** — Glassnode 의존. **보류**.
 - [ ] **Bitcoin Terminal Price** — Glassnode 의존. **보류**.
@@ -309,6 +309,43 @@
 - [x] **검증 (2026-05-18)** — 약 34건 적재 (positive/neutral/negative + tech/regulation/general/hack/partnership/listing 모두 등장). Gemini RPD 20 한도 안에서 cron 자동 백필.
 - [ ] 102건 전체 완료 대기 — cron 매시간 :15 UTC 약 4일 소요
 - [ ] prod URL 시각 검증 — NewsFeed 배지/태그 표시
+
+---
+
+## 변경 push (사용자 실행 완료, 본 세션 #3 내 발생)
+
+> 직전 세션 #2 까지의 누적 21파일(14 modified + 7 untracked) 변경을 본 세션 #3 안내 직후 사용자가 가이드 그대로 5 commit + push 실행 완료. Vercel webhook 자동 발화.
+
+### 적용된 5 commit (origin/main 반영 확인)
+- [x] `e38895b feat(frontend): Coinbase 디자인 토큰 전면 적용` (8 파일)
+- [x] `bc09ef1 feat(frontend/news): 카드 캐러셀 + 한글 번역 (MyMemory)` (3 파일)
+- [x] `9f53e1c feat(frontend/chart): v5 paneIndex multi-pane RSI/MACD` (1 파일)
+- [x] `fdecd96 feat(stage2.5): peak_signals 14 지표 워커 + 표 UI` (6 파일)
+- [x] `8940c3d docs: Stage 2.5 진행률 14/23 + 운영 안정화 반영` (3 파일)
+- [x] `git push origin main` — `Your branch is up to date with 'origin/main'` 확인
+
+### 잔여 — 다음 세션에서 마무리
+- [ ] 본 세션 #3 4 문서 갱신분(`CLAUDE.md` / `checklist.md` / `frontend/DESIGN.md` / `progress.md`) 6번째 docs commit으로 push (메시지 예: `docs: 세션 #3 마감 — push 가이드 확정 + 실행 결과 반영`)
+
+### push 후 즉시 검증 (사용자 실행 대기)
+- [ ] `gh workflow run peak-signals.yml` — cron 02:30 UTC 안 기다리고 14행 첫 적재 트리거
+- [ ] Supabase SQL `select count(*), max(captured_at) from peak_signals;` → 14 + 최신 UTC 확인
+- [ ] Vercel `Deployments` 첫 행이 `8940c3d` source로 Ready 확인 (1~2분)
+
+### 시각 검증 (시크릿창 권장, 캐시 회피)
+- [ ] `https://crypto-monitoring-one.vercel.app/` 시크릿창 (Cmd+Shift+N)
+- [ ] 폰트 — 본문 Inter, 숫자 JetBrains Mono
+- [ ] CTA — Coinbase Blue `#0052ff` pill (radius 100px)
+- [ ] 카드 — 흰 배경 + 1px hairline + 24px radius
+- [ ] 뉴스 — 카드 캐러셀 + ←/→ + 한국어 제목 (영문 작은 회색 이탤릭)
+- [ ] 차트 모달 — 가격/RSI(30·70 점선)/MACD(line+Signal+Histogram) 3단 세로
+- [ ] PeakSignals 표 — 14행, 12 진행률 막대 + 2 회색 "데이터 부족"
+
+### 트러블슈팅
+- Vercel 빌드 실패 — `Deployments` 행 클릭 → `View Build Logs`로 에러 확인. 로컬 `npm run build` 통과 후 push했으면 거의 안 생김.
+- 폰트 미적용 — DevTools Network에서 `fonts.googleapis.com` 차단 여부 확인
+- PeakSignals 빈 표 — `gh workflow run peak-signals.yml` 발화 후 1분 기다리거나 Supabase `select count(*) from peak_signals;` 0이면 워커 미발화
+- 번역 안 보임 — MyMemory 일 5천 단어/IP 한도 초과. 다음 날 자동 복구. localStorage 캐시는 살아있음.
 
 ---
 

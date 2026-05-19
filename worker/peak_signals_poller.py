@@ -21,10 +21,12 @@ from __future__ import annotations
 
 import math
 import os
+import re
 import signal
 import sys
 import time
 from datetime import datetime, timezone
+from html.parser import HTMLParser
 from typing import Callable
 
 import httpx
@@ -88,6 +90,13 @@ COINGECKO_TREASURY_URL = "https://api.coingecko.com/api/v3/companies/public_trea
 # MSTR PnL 배수 임계값 — 역사적 사이클 top에서 BTC가 MSTR 평균 매입가의 ~2.4-2.5배.
 MSTR_PNL_THRESHOLD = 2.0
 
+# Farside 공개 BTC spot ETF flow 표 (US$m). Cloudflare가 차단하면 error 행으로 가시화한다.
+FARSIDE_BTC_ETF_FLOW_URL = "https://farside.co.uk/bitcoin-etf-flow-all-data/"
+# ETF 순유출 streak — 5거래일 연속 순유출이면 위험 신호로 간주.
+ETF_OUTFLOW_STREAK_THRESHOLD = 5.0
+# Farside는 보유 BTC가 아니라 USD flow만 제공한다. 누적 순유입 / BTC 시총 proxy가 5% 이상이면 과열권으로 표시.
+ETF_NET_FLOW_MCAP_RATIO_THRESHOLD = 5.0
+
 # CoinMarketCap Pro API (Basic 무료 plan: 10k credits/월, 30 req/min).
 # 호출 시 X-CMC_PRO_API_KEY 헤더 필수. CMC_API_KEY env 없으면 관련 지표 skip.
 CMC_BASE = "https://pro-api.coinmarketcap.com"
@@ -97,6 +106,33 @@ CMC_ALTCOIN_SEASON_PATH = "/v1/altcoin-season-index/latest"
 CMC_ALTCOIN_SEASON_THRESHOLD = 75.0  # 정점 신호 — 알트시즌 진입 (BTC 사이클 후반)
 
 _shutdown = False
+
+
+class _TableTextParser(HTMLParser):
+    """HTML table cell text collector. Farside 표처럼 단순 table인 경우만 사용."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.in_cell = False
+        self.current: list[str] = []
+        self.cells: list[str] = []
+
+    def handle_starttag(self, tag: str, _attrs) -> None:
+        if tag.lower() in ("td", "th"):
+            self.in_cell = True
+            self.current = []
+
+    def handle_data(self, data: str) -> None:
+        if self.in_cell:
+            self.current.append(data)
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag.lower() in ("td", "th") and self.in_cell:
+            text = " ".join("".join(self.current).split())
+            if text:
+                self.cells.append(text)
+            self.in_cell = False
+            self.current = []
 
 
 def _request_shutdown(signum: int, _frame) -> None:
@@ -193,6 +229,104 @@ def fetch_treasury() -> dict | None:
             time.sleep(wait)
     print(f"[peak] treasury fetch failed after {MAX_RETRIES}: {last_exc!r}", flush=True)
     return None
+
+
+def fetch_farside_etf_flows() -> list[dict] | None:
+    """Farside BTC ETF flow 표를 파싱해 [{date, total_usdm}] 반환.
+    Farside 값 단위는 US$m. 음수는 괄호 표기 "(95.1)"도 지원한다.
+    """
+    last_exc: Exception | None = None
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36"
+        ),
+        "Accept": "text/html,application/xhtml+xml",
+    }
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            with httpx.Client(timeout=HTTP_TIMEOUT_SECONDS, follow_redirects=True, headers=headers) as client:
+                resp = client.get(FARSIDE_BTC_ETF_FLOW_URL)
+                if resp.status_code == 429:
+                    wait = BACKOFF_BASE_SECONDS ** attempt
+                    print(f"[peak] farside 429, retry {attempt}/{MAX_RETRIES} in {wait:.0f}s", flush=True)
+                    time.sleep(wait)
+                    continue
+                resp.raise_for_status()
+                html = resp.text
+            if "Just a moment" in html and "Cloudflare" in html:
+                print("[peak] farside blocked by Cloudflare challenge", flush=True)
+                return None
+            rows = parse_farside_etf_flows(html)
+            if rows:
+                return rows
+            print("[peak] farside parse returned no rows", flush=True)
+            return None
+        except (httpx.HTTPError, ValueError) as e:
+            last_exc = e
+            wait = BACKOFF_BASE_SECONDS ** attempt
+            print(f"[peak] farside error ({e!r}), retry {attempt}/{MAX_RETRIES} in {wait:.0f}s", flush=True)
+            time.sleep(wait)
+    print(f"[peak] farside fetch failed after {MAX_RETRIES}: {last_exc!r}", flush=True)
+    return None
+
+
+def parse_farside_etf_flows(html: str) -> list[dict]:
+    parser = _TableTextParser()
+    parser.feed(html)
+    cells = parser.cells
+    if not cells:
+        # 검색/캐시된 plain text처럼 HTML cell tag가 제거된 경우를 위한 약한 fallback.
+        cells = [line.strip() for line in html.splitlines() if line.strip()]
+    try:
+        date_idx = cells.index("Date")
+        total_idx = cells.index("Total", date_idx)
+    except ValueError:
+        return []
+    columns = cells[date_idx:total_idx + 1]
+    width = len(columns)
+    if width < 2:
+        return []
+    rows: list[dict] = []
+    i = total_idx + 1
+    while i + width <= len(cells):
+        chunk = cells[i:i + width]
+        parsed_date = _parse_farside_date(chunk[0])
+        if not parsed_date:
+            i += 1
+            continue
+        total = _parse_flow_usdm(chunk[-1])
+        if total is not None:
+            rows.append({"date": parsed_date, "total_usdm": total})
+        i += width
+    rows.sort(key=lambda r: r["date"])
+    return rows
+
+
+def _parse_farside_date(raw: str) -> str | None:
+    raw = " ".join(raw.split())
+    for fmt in ("%d %b %Y", "%d %B %Y"):
+        try:
+            return datetime.strptime(raw, fmt).date().isoformat()
+        except ValueError:
+            pass
+    return None
+
+
+def _parse_flow_usdm(raw: str) -> float | None:
+    text = raw.strip().replace(",", "")
+    if text in ("", "-", "—"):
+        return 0.0
+    neg = text.startswith("(") and text.endswith(")")
+    text = text.strip("()")
+    text = re.sub(r"[^0-9.\-]", "", text)
+    if text in ("", "-", "."):
+        return None
+    try:
+        value = float(text)
+    except ValueError:
+        return None
+    return -value if neg else value
 
 
 def _find_strategy(companies: list[dict]) -> dict | None:
@@ -518,6 +652,90 @@ def compute_mstr_pnl_ratio(treasury: dict | None, captured_at: str) -> dict:
     )
 
 
+def compute_etf_outflow_streak(etf_flows: list[dict] | None, captured_at: str) -> dict:
+    """BTC spot ETF 총 flow가 며칠 연속 순유출인지 계산. threshold 5 거래일."""
+    if not etf_flows:
+        return _row(
+            "etf_outflow_streak", None, ETF_OUTFLOW_STREAK_THRESHOLD, None, None,
+            source="farside", status="error",
+            note="Farside ETF flow fetch/parse failed",
+            captured_at=captured_at,
+        )
+    streak = 0
+    for row in sorted(etf_flows, key=lambda r: r["date"], reverse=True):
+        if float(row["total_usdm"]) < 0:
+            streak += 1
+        else:
+            break
+    latest = max(etf_flows, key=lambda r: r["date"])
+    hit = streak >= ETF_OUTFLOW_STREAK_THRESHOLD
+    progress = min(100.0, max(0.0, (streak / ETF_OUTFLOW_STREAK_THRESHOLD) * 100))
+    return _row(
+        "etf_outflow_streak",
+        value=float(streak),
+        threshold=ETF_OUTFLOW_STREAK_THRESHOLD,
+        hit=hit,
+        progress_pct=round(progress, 2),
+        source="farside",
+        status="ok",
+        note=f"latest={latest['date']} total=${float(latest['total_usdm']):.1f}m rows={len(etf_flows)}",
+        captured_at=captured_at,
+    )
+
+
+def compute_etf_net_flow_btc_mcap_ratio(
+    etf_flows: list[dict] | None,
+    global_data: dict | None,
+    captured_at: str,
+) -> dict:
+    """Farside 누적 BTC ETF 순유입(USD) / CoinGecko BTC 시총(%).
+    Farside는 ETF 보유 BTC 수량을 제공하지 않으므로, 보유량 비율이 아닌 flow/mcap proxy다.
+    """
+    if not etf_flows:
+        return _row(
+            "etf_net_flow_btc_mcap_pct", None, ETF_NET_FLOW_MCAP_RATIO_THRESHOLD, None, None,
+            source="farside+coingecko", status="error",
+            note="Farside ETF flow fetch/parse failed",
+            captured_at=captured_at,
+        )
+    if not global_data:
+        return _row(
+            "etf_net_flow_btc_mcap_pct", None, ETF_NET_FLOW_MCAP_RATIO_THRESHOLD, None, None,
+            source="farside+coingecko", status="error",
+            note="CoinGecko global fetch failed",
+            captured_at=captured_at,
+        )
+    total_market_cap = (global_data.get("total_market_cap") or {}).get("usd")
+    btc_pct = (global_data.get("market_cap_percentage") or {}).get("btc")
+    try:
+        btc_mcap = float(total_market_cap) * (float(btc_pct) / 100.0)
+    except (TypeError, ValueError):
+        btc_mcap = 0.0
+    if btc_mcap <= 0:
+        return _row(
+            "etf_net_flow_btc_mcap_pct", None, ETF_NET_FLOW_MCAP_RATIO_THRESHOLD, None, None,
+            source="farside+coingecko", status="error",
+            note=f"invalid btc_mcap total_market_cap={total_market_cap} btc_pct={btc_pct}",
+            captured_at=captured_at,
+        )
+    cumulative_usd = sum(float(r["total_usdm"]) for r in etf_flows) * 1_000_000.0
+    pct = (cumulative_usd / btc_mcap) * 100.0
+    hit = pct >= ETF_NET_FLOW_MCAP_RATIO_THRESHOLD
+    progress = min(100.0, max(0.0, (pct / ETF_NET_FLOW_MCAP_RATIO_THRESHOLD) * 100))
+    latest = max(etf_flows, key=lambda r: r["date"])
+    return _row(
+        "etf_net_flow_btc_mcap_pct",
+        value=round(pct, 4),
+        threshold=ETF_NET_FLOW_MCAP_RATIO_THRESHOLD,
+        hit=hit,
+        progress_pct=round(progress, 2),
+        source="farside+coingecko",
+        status="ok",
+        note=f"cum_flow=${cumulative_usd/1_000_000_000:.2f}b btc_mcap=${btc_mcap/1_000_000_000:.2f}b latest={latest['date']}",
+        captured_at=captured_at,
+    )
+
+
 def compute_altcoin_season_index(captured_at: str) -> dict:
     """CMC Altcoin Season Index — 0-100 스케일, ≥75는 알트시즌(사이클 후반).
     CMC_API_KEY env 없으면 insufficient_data로 적재(사용자에게 누락 표시).
@@ -773,9 +991,11 @@ def run_once(supabase: Client) -> int:
     closes_with_time = fetch_btc_closes(supabase, limit=400)
     closes = [c for _, c in closes_with_time]
     treasury = fetch_treasury()
+    etf_flows = fetch_farside_etf_flows()
     print(
         f"[peak] sources global={'ok' if global_data else 'fail'} "
-        f"btc_closes={len(closes)} treasury={'ok' if treasury else 'fail'}",
+        f"btc_closes={len(closes)} treasury={'ok' if treasury else 'fail'} "
+        f"etf_flows={len(etf_flows) if etf_flows else 'fail'}",
         flush=True,
     )
 
@@ -802,6 +1022,8 @@ def run_once(supabase: Client) -> int:
             "mvrv_ratio", "mvrv", "mvrv", MVRV_THRESHOLD, captured_at,
         ),
         # 2.5-C 합법 무료 — Strategy(구 MicroStrategy) BTC 보유 (CoinGecko)
+        lambda: compute_etf_outflow_streak(etf_flows, captured_at),
+        lambda: compute_etf_net_flow_btc_mcap_ratio(etf_flows, global_data, captured_at),
         lambda: compute_mstr_btc_holdings(treasury, captured_at),
         lambda: compute_mstr_pnl_ratio(treasury, captured_at),
         # 2.5-B0 CMC 공식 API — Altcoin Season Index (CMC_API_KEY 발급 시 활성화)

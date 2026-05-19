@@ -4,9 +4,44 @@
 
 ---
 
-## 현재 상태 (2026-05-18 후속 세션 마감 #2, **본 세션 누적 변경 파일 다수, 커밋 0건 — push 보류 결정 위임**)
+## 현재 상태 (2026-05-19 후속 세션 — **2.5-C ETF flow 2개 지표 구현**, 문서/검증 갱신)
 
-**한 줄 요약** — Coinbase 디자인 + NewsFeed 캐러셀/번역 + ChartModal 3단 multi-pane + **Stage 2.5 14개 지표 적재(13 ok + 1 사용자 액션 대기)** 완료. peak-signals.yml은 여전히 push 전이라 cron 미발화 — push 시 자동 매일 02:30 UTC 발화.
+**한 줄 요약** — `checklist.md`의 2.5-C 미처리 항목 중 ETF 2개를 진행. Farside 공개 BTC ETF flow 표 파서 추가 → `etf_outflow_streak`, `etf_net_flow_btc_mcap_pct` 계산 및 UI 메타데이터 반영. 실제 Farside+CoinGecko 데이터 계산 검증 완료 후 `POLL_ONCE=1` 워커로 Supabase 오늘자 16개 지표 적재 완료(최신 ETF 데이터 2026-05-18, 순유출 2거래일, flow/BTC mcap 3.7433%). USDT 플렉서블 세이빙은 Binance Earn 스크랩 안정성이 낮아 보류 유지.
+
+**본 세션 산출**
+- **2.5-C ETF 순유출 일수** — Farside `bitcoin-etf-flow-all-data` 표 파서(`parse_farside_etf_flows`) + `compute_etf_outflow_streak()` 구현. threshold=5거래일. Farside Cloudflare 차단 시 `status=error` 행으로 운영 가시화.
+- **2.5-C ETF/BTC 비율 proxy** — Farside 누적 순유입(US$m) / CoinGecko BTC 시총(%)로 `etf_net_flow_btc_mcap_pct` 구현. Farside는 보유 BTC 수량이 아니라 USD flow만 제공하므로 UI 설명에 proxy 명시.
+- **프론트 메타데이터** — `frontend/src/lib/peakSignals.ts`에 2개 라벨/설명/표시순서 추가, `PeakSignals.tsx`에 `days` 단위 표시 추가.
+- **검증/적재** — `py_compile` 통과, `npm run build` 통과, 샘플 HTML parser 테스트 통과, 실제 Farside 605행 파싱 및 CoinGecko 결합 계산 통과. `POLL_ONCE=1 .venv/bin/python3 peak_signals_poller.py` 실행으로 Supabase 오늘자 16행 upsert 완료.
+
+**로컬 계산 결과 (신규 ETF 2개)**
+| 지표 | 값 | hit | 진행률 | note |
+|---|---:|---|---:|---|
+| etf_outflow_streak | 2일 | ❌ | 40.0% | latest=2026-05-18 total=$-648.6m rows=605 |
+| etf_net_flow_btc_mcap_pct | 3.7433% | ❌ | 74.87% | cum_flow=$57.74b btc_mcap=$1542.42b latest=2026-05-18 |
+
+**잔여 보류**
+- `USDT 플렉서블 세이빙` — Binance Earn 공개 페이지 스크랩 안정성 낮아 보류.
+- 기존 보류 유지 — CMC_API_KEY, CoinGlass Hobbyist 결정, 2년/4년 MA 데이터 누적.
+
+---
+
+## 이전 상태 (2026-05-18 후속 세션 마감 #3 — **사용자가 push 가이드 그대로 5 commit 실행 + push 완료**, Vercel 자동 배포 진행)
+
+**한 줄 요약** — Vercel ≠ localhost 원인 명확화 → 5 commit 분할 가이드 안내 → 사용자가 가이드 그대로 **이미 push 실행 완료**(commit `e38895b`/`bc09ef1`/`9f53e1c`/`fdecd96`/`8940c3d` 5개, `Your branch is up to date with 'origin/main'`). Vercel webhook 자동 발화. peak-signals.yml이 main에 올라갔으므로 cron 매일 02:30 UTC 자동 발화 시작.
+
+**본 세션 산출**
+- **Vercel ≠ localhost 원인 진단** — `git status` 21파일(14 modified + 7 untracked) 미커밋 → Vercel은 GitHub `main` push만 트리거하므로 로컬 변경 반영 불가. 가이드만으로 해결 가능한 문제.
+- **5 commit 분할안 + push 절차 안내** — VS Code 터미널 위치, 사전 빌드 검증(`npm run build`), `git add` 파일 명단, commit 메시지, push 명령, Vercel 대시보드 확인 흐름.
+- **사용자 push 실행 결과 (확인됨)** — 5 commit 모두 origin/main에 적용, working tree 4파일(본 세션에서 추가 갱신한 progress/checklist/CLAUDE/DESIGN)만 남음. 이건 본 세션 #3 정리분 → 다음 commit으로 별도 push 필요.
+
+**push 후 즉시 해야 할 일 (사용자 실행 대기)**
+- `gh workflow run peak-signals.yml` — cron 02:30 UTC 안 기다리고 14행 첫 cron 적재 검증
+- Vercel `Deployments` 첫 행 Building → Ready 확인 (1~2분)
+- 시크릿창으로 `https://crypto-monitoring-one.vercel.app/` 시각 검증 (폰트/CTA/카드/뉴스 캐러셀/3단 차트/PeakSignals 14행)
+- 본 세션 #3 정리분 4파일(progress/checklist/CLAUDE/DESIGN) 추가 commit·push (메시지 예: `docs: 세션 #3 마감 — push 가이드 확정 + 실행 결과 반영`)
+
+**한 줄 요약 (이전 세션 누적, 보전)** — Coinbase 디자인 + NewsFeed 캐러셀/번역 + ChartModal 3단 multi-pane + **Stage 2.5 14개 지표 적재(12 ok + 2 사용자 액션·자동 대기)** 완료. peak-signals.yml은 push 전이라 cron 미발화 — push 시 자동 매일 02:30 UTC 발화.
 
 **본 세션 산출 묶음**
 
@@ -171,13 +206,24 @@ session prop이 `App → AppShell`로, userId prop이 `AppShell → HoldingForm`
 
 ## 다음 할 일 (다음 세션 시작 시)
 
-### 사용자 결정 대기 (가장 우선)
-- **누적 변경 push 결정** — Stage 2.5 1차 + B1 + D + C(MSTR) + B0 skeleton + 운영 안정화 + Coinbase 디자인 + NewsFeed 캐러셀 등. 분할 권장 4-5 commit:
-  1. `feat(frontend): Coinbase 디자인 적용 (DESIGN.md + 전체 리스킨)`
-  2. `feat(news): 카드 캐러셀 + 섹션 분류 + 한글 번역 + symbols 임베딩`
-  3. `feat(stage2.5): peak_signals 인프라 + 13 지표(자체계산 7 + bitcoin-data 4 + MSTR 2)`
-  4. `feat(stage2.5-b0): CMC altcoin_season_index skeleton (CMC_API_KEY 대기)`
-  5. `fix(peak): bitcoin-data 60s first-retry + upsert error 가드`
+### 누적 push — 완료 (사용자 실행, 본 세션 #3 내 발생)
+- **5 commit 적용 및 origin/main push 완료** — 로그 확인.
+
+  | hash | 메시지 |
+  |---|---|
+  | `e38895b` | `feat(frontend): Coinbase 디자인 토큰 전면 적용` |
+  | `bc09ef1` | `feat(frontend/news): 카드 캐러셀 + 한글 번역 (MyMemory)` |
+  | `9f53e1c` | `feat(frontend/chart): v5 paneIndex multi-pane RSI/MACD` |
+  | `fdecd96` | `feat(stage2.5): peak_signals 14 지표 워커 + 표 UI` |
+  | `8940c3d` | `docs: Stage 2.5 진행률 14/23 + 운영 안정화 반영` |
+
+- **잔여 working tree 4파일** — 본 세션 #3 갱신분(`CLAUDE.md` / `checklist.md` / `frontend/DESIGN.md` / `progress.md`)만 남음. 6번째 docs commit으로 별도 push 필요(메시지 예: `docs: 세션 #3 마감 — push 가이드 확정 + 실행 결과 반영`).
+
+### push 후 즉시 검증 (다음 세션 시작 시)
+- `gh workflow run peak-signals.yml` — cron 02:30 UTC 안 기다리고 14행 첫 적재 트리거
+- Supabase SQL `select count(*), max(captured_at) from peak_signals;` → 14 행 + 최신 UTC 확인
+- Vercel `Deployments` 첫 행이 `8940c3d` source로 Ready 확인
+- 시크릿창으로 `https://crypto-monitoring-one.vercel.app/` 6개 시각 항목 확인 (폰트/CTA/카드/뉴스 캐러셀/3단 차트/PeakSignals 14행)
 
 ### CMC key 발급 후 사용자 알림 (2.5-B0 활성화)
 - 사용자가 CMC Basic 무료 plan 키 발급 + `worker/.env`에 `CMC_API_KEY=<값>` 저장 + `gh secret set CMC_API_KEY` 후 신호 시:
@@ -238,6 +284,14 @@ session prop이 `App → AppShell`로, userId prop이 `AppShell → HoldingForm`
 ---
 
 ## 의사결정 로그
+
+### 2026-05-18 후속 #3 (push 가이드 안내 + 사용자 실행 완료, 코드 변경 0)
+- **Vercel ≠ localhost 원인 진단** — Why: 사용자가 prod URL이 옛 화면이라고 확인. `git status` 21파일(14 modified + 7 untracked) 미커밋 확정. Vercel은 GitHub `main` 브랜치 push만 트리거되므로 로컬 변경은 절대 반영 안 됨. **결론** — 코드 변경 0, 가이드만 정확화.
+- **사용자가 가이드 그대로 push 실행** — Why: 가이드 안내 직후 사용자가 VS Code 터미널에서 5 commit 분할 + `git push origin main` 모두 실행 완료. 로그 확인 결과 commit 메시지와 파일 매핑이 가이드와 정확히 일치 (`Your branch is up to date with 'origin/main'`). Vercel webhook 자동 발화 → 1~2분 후 Ready 예상.
+- **5 commit 분할 확정안** — Why: 직전 세션 progress.md "다음 할 일"의 4~5 commit 권장을 실제 `git add` 파일 명단 + 메시지로 확정. 한 commit이 한 문장으로 설명 가능한 단위(CLAUDE.md §11). 5번째 docs commit은 본 세션 변경분(progress/checklist/CLAUDE/DESIGN)까지 포함하도록 마지막에 배치.
+- **사전 검증 강제** — Why: push → Vercel build 실패 시 디버깅 거리(로컬 → push → log 확인 → fix → 재push)가 길다. `npm run build` 로컬 1회로 TypeScript·번들 에러 즉시 차단. ~30초 비용으로 round-trip 최소화.
+- **VS Code 터미널 위치 명시** — Why: 사용자가 "어디서 작업해야 하는지 모르겠다"고 명시 요청. 터미널 vs Vercel 대시보드 vs 브라우저 3곳을 단계별 표로 분리 안내. Vercel 대시보드는 6번(빌드 진행 확인) + 7번(URL 시각 검증)만 사용, 나머지는 모두 터미널.
+- **환경변수 추가 등록 불필요 확인** — Why: 본 세션 신규 코드(MyMemory 번역 / PeakSignals 표) 모두 추가 키 없이 동작. Vercel 환경변수는 Stage 0 등록분(`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`) 그대로 사용. 스크린샷에서 4시간 전 deployment Ready 상태 확인됨.
 
 ### 2026-05-18 후속 #2 (Stage 2.5 확장 — 13 추가 지표 + B0 skeleton + 운영 안정화)
 - **2.5-B1 5개 자체계산 우선 진행** — Why: 사용자 액션(키 발급) 없이 즉시 추가 가능. BTC 캔들이 이미 372d 있어 RSI 22 / AHR999(200d 기하평균 + 회귀가격) / Rainbow Band(log 회귀, AHR999와 동일 baseline) 즉시 계산. 2y MA Multiple(730d 필요)은 skeleton만 활성화하고 candle-poll 누적으로 자연 활성화 대기.
