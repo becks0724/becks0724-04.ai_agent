@@ -1,0 +1,15 @@
+<!-- crypto-monitoring 로고 후보 1: 포트폴리오 궤도와 모니터링 포인트를 결합한 워드마크. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="160" viewBox="0 0 512 160" role="img" aria-labelledby="title desc">
+  <title id="title">crypto-monitoring logo candidate 1 orbit</title>
+  <desc id="desc">Blue circular orbit mark with crypto-monitoring wordmark.</desc>
+  <g fill="none" stroke="#0052ff" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="78" cy="80" r="43" stroke-width="10"/>
+    <path d="M42 90c22-34 54-47 94-36" stroke-width="10"/>
+    <path d="M42 70c23 34 56 47 94 36" stroke-width="10"/>
+    <circle cx="78" cy="80" r="10" fill="#0052ff" stroke="none"/>
+    <circle cx="131" cy="55" r="7" fill="#0052ff" stroke="none"/>
+    <circle cx="132" cy="105" r="7" fill="#0052ff" stroke="none"/>
+  </g>
+  <text x="158" y="75" fill="#0052ff" font-family="Inter, Arial, sans-serif" font-size="34" font-weight="600" letter-spacing="0">crypto</text>
+  <text x="158" y="112" fill="#0052ff" font-family="Inter, Arial, sans-serif" font-size="34" font-weight="400" letter-spacing="0">monitoring</text>
+</svg>

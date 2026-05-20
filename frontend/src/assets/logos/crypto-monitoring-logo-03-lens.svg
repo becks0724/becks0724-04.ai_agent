@@ -1,0 +1,15 @@
+<!-- crypto-monitoring 로고 후보 3: 관찰 렌즈와 캔들 데이터를 결합한 심볼형 워드마크. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="160" viewBox="0 0 512 160" role="img" aria-labelledby="title desc">
+  <title id="title">crypto-monitoring logo candidate 3 lens</title>
+  <desc id="desc">Blue inspection lens mark over candlestick bars with crypto-monitoring wordmark.</desc>
+  <g fill="none" stroke="#0052ff" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="75" cy="72" r="35" stroke-width="10"/>
+    <path d="m101 98 28 28" stroke-width="10"/>
+    <path d="M58 88V58" stroke-width="8"/>
+    <path d="M76 94V50" stroke-width="8"/>
+    <path d="M94 84V62" stroke-width="8"/>
+    <path d="M51 72h14M69 63h14M87 72h14" stroke-width="7"/>
+  </g>
+  <text x="158" y="75" fill="#0052ff" font-family="Inter, Arial, sans-serif" font-size="34" font-weight="600" letter-spacing="0">crypto</text>
+  <text x="158" y="112" fill="#0052ff" font-family="Inter, Arial, sans-serif" font-size="34" font-weight="400" letter-spacing="0">monitoring</text>
+</svg>

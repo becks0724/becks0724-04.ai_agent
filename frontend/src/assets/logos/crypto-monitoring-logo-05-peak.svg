@@ -1,0 +1,12 @@
+<!-- crypto-monitoring 로고 후보 5: 정점 신호와 경보 임계선을 단순화한 워드마크. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="160" viewBox="0 0 512 160" role="img" aria-labelledby="title desc">
+  <title id="title">crypto-monitoring logo candidate 5 peak</title>
+  <desc id="desc">Blue peak signal mark with crypto-monitoring wordmark.</desc>
+  <g fill="none" stroke="#0052ff" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M36 112h92" stroke-width="10"/>
+    <path d="M46 104 74 46l22 38 16-22 22 42" stroke-width="10"/>
+    <path d="M48 70h20M108 70h20" stroke-width="7"/>
+    <circle cx="74" cy="46" r="8" fill="#0052ff" stroke="none"/>
+  </g>
+  <text x="158" y="94" fill="#0052ff" font-family="Inter, Arial, sans-serif" font-size="38" font-weight="500" letter-spacing="0">crypto-monitoring</text>
+</svg>

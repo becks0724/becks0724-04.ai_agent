@@ -1,0 +1,13 @@
+<!-- crypto-monitoring 로고 후보 4: 대시보드 그리드와 가격 라인을 압축한 앱 아이콘형 워드마크. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="160" viewBox="0 0 512 160" role="img" aria-labelledby="title desc">
+  <title id="title">crypto-monitoring logo candidate 4 grid</title>
+  <desc id="desc">Blue dashboard grid mark with crypto-monitoring wordmark.</desc>
+  <g fill="none" stroke="#0052ff" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="36" y="36" width="92" height="92" rx="20" stroke-width="10"/>
+    <path d="M64 36v92M36 72h92" stroke-width="7"/>
+    <path d="M50 102c13-18 24-18 34-8s18 10 31-10" stroke-width="8"/>
+    <circle cx="115" cy="84" r="6" fill="#0052ff" stroke="none"/>
+  </g>
+  <text x="158" y="75" fill="#0052ff" font-family="Inter, Arial, sans-serif" font-size="34" font-weight="600" letter-spacing="0">crypto</text>
+  <text x="158" y="112" fill="#0052ff" font-family="Inter, Arial, sans-serif" font-size="34" font-weight="400" letter-spacing="0">monitoring</text>
+</svg>

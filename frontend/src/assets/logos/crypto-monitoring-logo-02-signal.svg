@@ -1,0 +1,11 @@
+<!-- crypto-monitoring 로고 후보 2: 상승/하락이 아닌 중립적 데이터 신호 파형을 강조한 워드마크. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="160" viewBox="0 0 512 160" role="img" aria-labelledby="title desc">
+  <title id="title">crypto-monitoring logo candidate 2 signal</title>
+  <desc id="desc">Blue rounded square signal mark with crypto-monitoring wordmark.</desc>
+  <g fill="none" stroke="#0052ff" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="36" y="34" width="92" height="92" rx="28" stroke-width="10"/>
+    <path d="M56 86h16l12-28 18 49 12-21h18" stroke-width="10"/>
+    <circle cx="82" cy="80" r="7" fill="#0052ff" stroke="none"/>
+  </g>
+  <text x="158" y="94" fill="#0052ff" font-family="Inter, Arial, sans-serif" font-size="38" font-weight="500" letter-spacing="0">crypto-monitoring</text>
+</svg>

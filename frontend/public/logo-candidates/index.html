@@ -1,0 +1,91 @@
+<!-- crypto-monitoring 로고 후보 5종을 브라우저에서 빠르게 비교하기 위한 프리뷰 페이지. -->
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>crypto-monitoring logo candidates</title>
+    <style>
+      :root {
+        --cb-primary: #0052ff;
+        --cb-ink: #0a0b0d;
+        --cb-border: #dee1e6;
+        --cb-surface: #f7f7f7;
+      }
+
+      body {
+        margin: 0;
+        background: #fff;
+        color: var(--cb-ink);
+        font-family: Inter, Arial, sans-serif;
+      }
+
+      main {
+        width: min(960px, calc(100vw - 40px));
+        margin: 40px auto;
+      }
+
+      h1 {
+        margin: 0 0 24px;
+        color: var(--cb-primary);
+        font-size: 28px;
+        font-weight: 500;
+        letter-spacing: 0;
+      }
+
+      .grid {
+        display: grid;
+        gap: 16px;
+      }
+
+      .candidate {
+        border: 1px solid var(--cb-border);
+        border-radius: 24px;
+        background: var(--cb-surface);
+        padding: 20px;
+      }
+
+      .candidate img {
+        display: block;
+        width: min(100%, 512px);
+        height: auto;
+        background: #fff;
+        border-radius: 16px;
+      }
+
+      .name {
+        margin-top: 12px;
+        color: var(--cb-primary);
+        font-size: 14px;
+        font-weight: 500;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>crypto-monitoring logo candidates</h1>
+      <section class="grid">
+        <article class="candidate">
+          <img src="./jpg/crypto-monitoring-logo-01-orbit.jpg" alt="candidate 1 orbit" />
+          <div class="name">01 Orbit</div>
+        </article>
+        <article class="candidate">
+          <img src="./jpg/crypto-monitoring-logo-02-signal.jpg" alt="candidate 2 signal" />
+          <div class="name">02 Signal</div>
+        </article>
+        <article class="candidate">
+          <img src="./jpg/crypto-monitoring-logo-03-lens.jpg" alt="candidate 3 lens" />
+          <div class="name">03 Lens</div>
+        </article>
+        <article class="candidate">
+          <img src="./jpg/crypto-monitoring-logo-04-grid.jpg" alt="candidate 4 grid" />
+          <div class="name">04 Grid</div>
+        </article>
+        <article class="candidate">
+          <img src="./jpg/crypto-monitoring-logo-05-peak.jpg" alt="candidate 5 peak" />
+          <div class="name">05 Peak</div>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>
