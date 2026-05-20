@@ -9,6 +9,8 @@
 **한 줄 요약** — `현재가 (USD)` 셀 하단에 CoinGecko 24시간 등락률을 표시하는 기능을 구현 중. `price_snapshots.price_change_24h_pct` nullable 컬럼용 `0009` 마이그레이션 추가, `price_poller.py`가 `/simple/price?include_24hr_change=true` 응답의 `usd_24h_change`를 저장하도록 확장, 프론트 `HoldingsList`는 현재가 아래 `+/-N.NN%`를 표시한다. 색상은 한국식 규칙으로 상승 빨강(`#cf202f`), 하락 파랑(`#0052ff`), 보합/데이터 없음 회색(`#5b616e`).
 
 **본 세션 산출**
+- **로고 후보 5종 제작** — `frontend/src/assets/logos/`에 Coinbase Blue `#0052ff` 단색 SVG 워드마크 5종(Orbit/Signal/Lens/Grid/Peak) 추가. 확대 대응을 위해 bitmap이 아닌 벡터로 제작.
+- **로고 후보 프리뷰** — `frontend/public/logo-candidates/index.html` 추가. 파일 브라우저 또는 Vite dev server에서 5개 후보를 한 화면에서 비교 가능.
 - **상단 Altcoin Season Index 배지** — `frontend/src/components/AppShell.tsx` 헤더의 Fear & Greed 옆에 `altcoin_season_index` 최신값을 표시. CMC key 미발급 상태(`insufficient_data`)는 `Altcoin Season 대기`로 표시하고 tooltip에 note를 노출.
 - **카드 접기/펼치기 토글** — `HoldingsList` 보유 자산 카드와 `PeakSignals` 강세장 정점 신호 카드 우측에 `숨기기/펼치기` 버튼 추가. 접힌 상태에서도 카드 헤더는 유지해 즉시 복구 가능.
 - **현재가 24h 등락률 표시** — `frontend/src/components/HoldingsList.tsx` 현재가 셀을 2줄로 변경. 상단 현재가, 하단 24h 등락률. null이면 `—` 표시.
@@ -21,6 +23,7 @@
 - 현재 Supabase 확인 결과 `price_snapshots.price_change_24h_pct`는 아직 없음(`42703`). 적용 전까지 프론트는 기존 가격 조회로 fallback, 워커는 기존 컬럼만 fallback insert한다.
 
 **검증 결과**
+- `xmllint --noout frontend/src/assets/logos/*.svg` 통과.
 - `python3 -m py_compile worker/price_poller.py` 통과.
 - `npm run build` 통과.
 - CoinGecko 파서 단위 확인: `bitcoin` 응답에서 `price_usd`와 `price_change_24h_pct` 파싱 성공.

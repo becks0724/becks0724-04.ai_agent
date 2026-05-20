@@ -387,6 +387,8 @@
 - [x] `NewsFeed.tsx` — 흰 카드 + segmented control pill 탭(active = ink #0a0b0d) + pill 감성 배지(라이트 톤) + pill 카테고리 태그
 - [x] `ChartModal.tsx` — 흰 모달 24px radius + #0052ff 라인 + #eef0f3 그리드 + asset-icon 헤더 + 5 Stat 카드(#f7f7f7 12px)
 - [x] `App.tsx` — 로딩 상태도 흰 캔버스로 통일
+- [x] 로고 후보 5종 제작 — `frontend/src/assets/logos/` 단색 SVG(Orbit/Signal/Lens/Grid/Peak), Coinbase Blue `#0052ff`만 사용
+- [x] 로고 후보 프리뷰 — `frontend/public/logo-candidates/index.html`
 
 ---
 
