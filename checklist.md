@@ -341,6 +341,29 @@
 - [x] Supabase 최신 `captured_at=2026-05-19T00:00:00+00:00` 기준 16행 확인
 - [x] Vercel Production deployment success + 운영 URL HTTP/2 200 확인
 
+### 2026-05-20 본 세션 push 5 commit (모두 origin/main 반영, Vercel 배포 완료)
+- [x] `85e2651 feat(stage2.5-b0): altcoin_season_index 무료 스크래핑 적용 (Blockchaincenter)` — `compute_altcoin_season_index()` 1순위 Blockchaincenter / 2순위 CMC fallback. cron 1회 발화 검증 `status=ok value=29 source=blockchaincenter`
+- [x] `4cbef8f style(frontend): 포트폴리오 요약 컬럼 가운데 정렬 통일` — `summaryStyles.col`에 `textAlign: 'center'` 한 줄. 3 컬럼 label·USD·KRW 모두 가운데
+- [x] `61bc4a8 feat(frontend): 로고 후보 5종 + 프리뷰 페이지 추가` — Coinbase Blue 단색 SVG 5종(Orbit/Signal/Lens/Grid/Peak) + JPG/PNG 미리보기 + `frontend/public/logo-candidates/index.html` 비교 화면
+- [x] `3a0a9d4 docs: Stage 2.5-B0 altcoin season 무료 스크래핑 + 로고 후보 + 24h 등락률 반영` — progress + checklist 갱신
+- [x] `0126730 feat(auth): Google OAuth 로그인으로 전환 (매직링크 제거)` — Login.tsx 재작성, `signInWithOAuth({ provider: 'google', queryParams: { prompt: 'select_account' } })` 단일 옵션
+
+### 2026-05-20 Google OAuth 사용자 액션 (1건 미완 — 검증에서 `Unsupported provider: provider is not enabled` 에러 확인)
+- [ ] **Step 1** [Supabase Auth Providers](https://supabase.com/dashboard/project/plpkmaqyrqkjqnvnqexe/auth/providers) — Google 패널의 Callback URL 복사 (`https://plpkmaqyrqkjqnvnqexe.supabase.co/auth/v1/callback`)
+- [ ] **Step 2-A** [Google Cloud Console](https://console.cloud.google.com/) — 프로젝트 생성 + OAuth consent screen(External, App name `crypto-monitoring`, 본인 이메일 + Test users 등록)
+- [ ] **Step 2-B** Credentials → OAuth client ID(Web application)
+  - Authorized JavaScript origins — `https://crypto-monitoring-one.vercel.app`, `http://localhost:5173`
+  - Authorized redirect URIs — Step 1 Callback URL 정확 그대로
+  - Client ID + Client Secret 복사
+- [ ] **Step 3** Supabase Google 패널 — `Enable Sign in with Google` 토글 ON + Client IDs 필드(❗`Authorized Client IDs` 아님) + Client Secret + 화면 아래 **Save** 클릭 → `Settings saved` 토스트 확인
+- [ ] **Step 4** 시크릿창 prod URL → `Google로 계속하기` → Google 동의 → 자동 로그인 검증
+
+### 2026-05-20 altcoin season 무료 활성화 검증 완료
+- [x] Blockchaincenter HTML 패턴 추출 검증 (로컬 `value=27`)
+- [x] `compute_altcoin_season_index()` 단독 row 출력 검증 (`source=blockchaincenter status=ok value=27 progress=36%`)
+- [x] commit `85e2651` push → `gh workflow run peak-signals.yml` 발화 → cron 적재 `value=29 progress=38.67%` 확인 (1분 사이 27→29 갱신, 실시간 라이브 확정)
+- [x] frontend AppShell `formatAltcoinSeason()` status별 분기 — status=ok 받자마자 헤더 배지 `대기` → `29` 자동 전환 (코드 변경 0)
+
 ### 시각 검증 (시크릿창 권장, 캐시 회피)
 - [x] `https://crypto-monitoring-one.vercel.app/` 운영 URL 응답 정상
 - [x] 폰트 — 본문 Inter, 숫자 JetBrains Mono

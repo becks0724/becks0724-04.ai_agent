@@ -4,26 +4,31 @@
 크립토 포트폴리오 모니터링과 뉴스·지표 대시보드를 제공하는 웹 애플리케이션이다.
 사용자는 수동으로 보유 자산을 입력하고, 실시간 시세·기술적 지표·뉴스 감성을 한 화면에서 확인한다.
 
-## 현재 단계 (2026-05-19 후속 세션 기준)
+## 현재 단계 (2026-05-20 세션 기준)
 - **Stage 0 완료** — Git/스캐폴드/GitHub(`becks0724/becks0724-04.ai_agent` **public**)/Supabase(Singapore)/Vercel(`crypto-monitoring-one.vercel.app`) 검증 완료.
 - **Stage 1 MVP 완료 + 현재가 24h 등락률 구현 중** — `portfolio_holdings`, `price_snapshots`, RLS 4+1, 워커 시세 폴러, 프론트 CRUD 완료. 현재 `price_change_24h_pct` nullable 컬럼용 `0009` 마이그레이션과 CoinGecko `usd_24h_change` 적재/표시 구현. Supabase SQL Editor에서 0009 실행 필요(현재 Supabase는 컬럼 없음, fallback insert 검증 완료).
 - **auth 리팩토링 완료** — `AuthProvider` Context 패턴, signOut/error 노출, env explicit throw.
+- **Google OAuth 전환 (2026-05-20, 사용자 액션 1건 미완)** — Login.tsx에서 매직링크 흐름 제거하고 `signInWithOAuth({ provider: 'google', queryParams: { prompt: 'select_account' } })` 단일 옵션으로 교체. 코드 commit `0126730` push 완료. 사용자 액션 — Google Cloud Console에서 OAuth client ID 발급 + Authorized JS origins(`https://crypto-monitoring-one.vercel.app`, `http://localhost:5173`) + Authorized redirect URIs(`https://plpkmaqyrqkjqnvnqexe.supabase.co/auth/v1/callback`) 등록 + Supabase Authentication > Providers > Google 활성화 + Client ID/Secret 입력 + Save. 현재 검증에서 `Unsupported provider: provider is not enabled` 에러 — Supabase Save 미완 추정. 사용자 액션 완료 후 첫 동의 1회 → refresh token 기반 자동 로그인.
 - **Stage 2 완료** — 5개 sub-stage. 2-E는 **multi-pane 차트** — v5 `paneIndex` API로 가격(0) + RSI 14(1, 30·70 reference 점선) + MACD(2, line+Signal+Histogram, 0 reference) 세로 3단 동기 차트.
 - **Stage 3 뉴스 완료** — RSS 4 sources, 102 entries / 69 ticker_links.
 - **Stage 2.6 coins_catalog + 동적 모드 완료** — 5000위 catalog + 워커 동적 매핑.
 - **Stage 4 LLM 분류** — Gemini 2.5 Flash-Lite, RPD 20 한도. 약 34/102 적재, cron 점진 백필.
 - **Coinbase 디자인 적용 완료** — `frontend/DESIGN.md` 토큰 사양서 + Inter/JetBrains Mono + 흰 캔버스 + 단일 voltage `#0052ff` + pill 100px + xl 24px. 6개 컴포넌트(Login/AppShell/HoldingForm/HoldingsList/NewsFeed/ChartModal) 리스킨. PeakSignals 신규 컴포넌트도 동일 토큰으로 적용.
 - **NewsFeed 카드 캐러셀 + 한글 번역** — 섹션 chip(감성/카테고리/종목/시간순) 점프 + ←/→ 순환 + N/M 카운터. MyMemory 무료 번역(localStorage 영구 캐시, 인접 prefetch). 영문 원본은 작은 회색 이탤릭 보조.
-- **Stage 2.5 진행 중 (16 / ~23 = 69.6%)** — `peak_signals` 테이블 + 워커 + cron 02:30 UTC + 프론트 표 UI. 16개 지표 로컬 적재 검증:
-  - **status=ok 14** — 자체계산 5(Mayer/Pi Cycle/RSI22/AHR999/Rainbow) + 도미넌스(CoinGecko) + 온체인 4(Puell/MVRV-Z/NUPL/MVRV via bitcoin-data.com) + ETF flow 2(Farside + CoinGecko proxy) + MSTR 2(CoinGecko `/companies/public_treasury/bitcoin`)
-  - **status=insufficient_data 2** — `two_year_ma_multiple`(730d 필요, 현 372d, candle-poll 누적으로 자동 활성화) / `altcoin_season_index`(CMC_API_KEY 사용자 액션 대기)
-  - **보류** — USDT Flexible Savings(Binance Earn 스크랩 안정성 낮음) / CoinGlass Hobbyist $29/월 결정 / Bull Market Support Band(정점 신호 부적합)
-- **헤더 지표** — Fear & Greed 옆에 Altcoin Season Index 배지를 추가. CMC key 미발급 상태는 `Altcoin Season 대기`로 표시.
-- **대시보드 접기/펼치기** — 보유 자산 카드와 강세장 정점 신호 카드 우측에 `숨기기/펼치기` 토글 추가.
+- **Stage 2.5 진행 중 (17 / ~23 = 73.9%)** — `peak_signals` 테이블 + 워커 + cron 02:30 UTC + 프론트 표 UI. 본 세션 #4에 altcoin_season_index 무료 활성화로 13개 status=ok 도달.
+  - **status=ok 13** — 도미넌스(CoinGecko) + 자체계산 5(Mayer/Pi Cycle/RSI22/AHR999/Rainbow) + 온체인 4(Puell/MVRV-Z/NUPL/MVRV via bitcoin-data.com) + MSTR 2 + **altcoin_season_index** 1(Blockchaincenter.net 정적 HTML 스크래핑, value=29 / progress 38.67%)
+  - **status=insufficient_data 1** — `two_year_ma_multiple`(730d 필요, 현 ~373d, candle-poll 누적으로 자동 활성화)
+  - **status=error 2** — ETF flow 2개(`etf_outflow_streak`, `etf_net_flow_btc_mcap_pct`). 직전 cron run에서 Farside 차단 가능성 — 별개 진단 항목
+  - **보류** — USDT Flexible Savings(Binance Earn 스크랩 안정성 낮음) / CoinGlass Hobbyist $29/월 결정 / Bull Market Support Band(정점 신호 부적합) / CMC key 발급(Blockchaincenter fallback이 이미 동작하므로 우선순위 낮음)
+- **altcoin_season_index 무료 적용 (2026-05-20)** — CMC docs로 endpoint path 확정했으나, 사용자 액션(키 발급)조차 불필요한 무료 옵션을 추가 발견. 원조 사이트 Blockchaincenter.net 정적 HTML(`Altcoin Season (<!-- -->N<!-- -->)`)에서 정규식 2단(정확 매칭 + hydration 변형 흡수, "Top 50" false positive 회피)으로 추출. `compute_altcoin_season_index()` 1순위 Blockchaincenter → 2순위 CMC(`CMC_API_KEY` 있으면). 검증 `status=ok source=blockchaincenter value=29`.
+- **헤더 지표** — Fear & Greed 옆에 Altcoin Season Index 배지. status별 분기(`ok` 숫자 / `insufficient_data` `대기` / `error` `오류`). 본 세션 #4 활성화로 `대기` → `29` 자동 전환.
+- **포트폴리오 요약 정렬** — SummaryBox 3 컬럼(총 평가금액 / 총 매수금액 / 손익) label·USD·KRW 모두 가운데 정렬. `summaryStyles.col` `textAlign: 'center'`.
+- **로고 후보** — Coinbase Blue `#0052ff` 단색 SVG 워드마크 5종(Orbit/Signal/Lens/Grid/Peak)을 `frontend/src/assets/logos/`에 추가. `frontend/public/logo-candidates/index.html` 프리뷰 페이지로 비교 가능. 본 도입은 미적용(워드마크 선택 사용자 결정 대기).
+- **대시보드 접기/펼치기** — 보유 자산 카드와 강세장 정점 신호 카드 우측에 `숨기기/펼치기` 토글.
 - **운영 안정화** — bitcoin-data.com 분당 한도(60s cooldown) 대응 — 첫 retry 60초 fixed sleep + upsert 가드(`status='error'`는 같은 captured_at에 ok 행 있으면 skip).
-- **워커 호스팅** — GitHub Actions cron **8개 워크플로** (price-poll 15분, fear-greed 01:00, candle-poll 01:15, indicators 01:30, news-poll 매시간 :05, coins-catalog 02:00, news-classify 매시간 :15, **peak-signals 02:30**). `peak-signals.yml`은 workflow_dispatch 검증 성공(run `26081203527`), 최신 16행 적재 확인.
-- **최근 push 완료** — `bfef5e2 feat(stage2.5): add ETF flow peak signals`로 ETF 2개 지표를 배포하고 `11b1c82 fix(frontend): keep peak signal badges on one line`로 `미명중` 배지 줄바꿈 수정까지 Vercel Production success. 운영 URL `https://crypto-monitoring-one.vercel.app/` HTTP/2 200 확인.
-- **다음 본 작업** — Supabase SQL Editor에서 `worker/migrations/0009_price_change_24h.sql` 실행 → price-poll 1회 실행으로 24h 등락률 적재 확인 → CMC Pro Basic key 발급(2.5-B0 활성화) → 2026-05-20 이후 peak-signals cron 자동 발화 16행 관측 → CoinGlass 결정/USDT Flexible Savings 보류 재평가.
+- **워커 호스팅** — GitHub Actions cron **8개 워크플로** (price-poll 15분, fear-greed 01:00, candle-poll 01:15, indicators 01:30, news-poll 매시간 :05, coins-catalog 02:00, news-classify 매시간 :15, **peak-signals 02:30**). peak-signals 본 세션 workflow_dispatch run `26145964204` success, altcoin season 첫 적재 확인.
+- **최근 push 완료 (2026-05-20 본 세션)** — `85e2651`(altcoin season Blockchaincenter), `4cbef8f`(SummaryBox 정렬), `61bc4a8`(로고 후보 5종), `3a0a9d4`(docs), `0126730`(Google OAuth 전환) 5개. Vercel Production success.
+- **다음 본 작업** — Google OAuth 사용자 액션 4단계 완료(Supabase Save까지) → ETF flow status=error 진단(Farside Cloudflare 차단 가능성 확인) → Supabase SQL Editor에서 `worker/migrations/0009_price_change_24h.sql` 실행 → 24h 등락률 정상 컬럼 적재 검증 → two_year_ma_multiple 자동 활성화 관측 → CoinGlass·USDT Flexible Savings 보류 재평가.
 - 세부 진행 사항은 `progress.md`, 작업 단위 체크리스트는 `checklist.md`, 디자인 토큰은 `frontend/DESIGN.md`.
 
 ## 기술 스택

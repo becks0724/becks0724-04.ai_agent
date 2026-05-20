@@ -4,9 +4,50 @@
 
 ---
 
-## 현재 상태 (2026-05-19 후속 세션 — **현재가 24h 등락률 구현 중**)
+## 현재 상태 (2026-05-20 세션 — **Google OAuth 전환 + altcoin season 무료 활성화 + SummaryBox 정렬 통일**, push 5 commit 완료, 사용자 액션 1건 미완)
 
-**한 줄 요약** — `현재가 (USD)` 셀 하단에 CoinGecko 24시간 등락률을 표시하는 기능을 구현 중. `price_snapshots.price_change_24h_pct` nullable 컬럼용 `0009` 마이그레이션 추가, `price_poller.py`가 `/simple/price?include_24hr_change=true` 응답의 `usd_24h_change`를 저장하도록 확장, 프론트 `HoldingsList`는 현재가 아래 `+/-N.NN%`를 표시한다. 색상은 한국식 규칙으로 상승 빨강(`#cf202f`), 하락 파랑(`#0052ff`), 보합/데이터 없음 회색(`#5b616e`).
+**한 줄 요약** — 매직링크 로그인을 Google OAuth로 교체(코드 push 완료, 사용자 액션 = Google Cloud OAuth client 발급 + Supabase Authentication > Providers > Google 등록만 남음). altcoin season index를 Blockchaincenter.net 정적 HTML 스크래핑으로 무료 활성화(키 불필요, value=29 로 status=ok 첫 적재). SummaryBox 3 컬럼 모두 가운데 정렬 통일. Coinbase Blue 로고 후보 5종 SVG 벡터 추가. Stage 2.5 진행률 17/23 = 73.9%.
+
+**본 세션 산출 (push 5 commit, 시간순)**
+
+1. **`85e2651` feat(stage2.5-b0): altcoin_season_index 무료 스크래핑 적용 (Blockchaincenter)** — CMC docs WebFetch로 endpoint path `/v1/altcoin-season-index/latest` + Basic 무료 plan 가용 확정. 다만 CMC key 발급도 불필요한 무료 옵션 발견 — 원조 사이트 Blockchaincenter.net 정적 HTML에 값 박혀 있음(`Altcoin Season (<!-- -->N<!-- -->)` 패턴). 워커 함수 `fetch_blockchaincenter_altseason()` + `compute_altcoin_season_index()` 1순위 Blockchaincenter(키 X) → 2순위 CMC(CMC_API_KEY 있을 때만) → 둘 다 실패 시 status=error. `gh workflow run peak-signals.yml` 검증 — `status=ok value=29 progress=38.67% source=blockchaincenter` 적재 성공.
+
+2. **`4cbef8f` style(frontend): 포트폴리오 요약 컬럼 가운데 정렬 통일** — 처음엔 총 매수금액/손익 sub만 가운데 정렬 요청 → 시각 통일성을 위해 전체로 확대. `summaryStyles.col`에 `textAlign: 'center'` 한 줄 추가로 3 컬럼 모두 label·USD·KRW 통일.
+
+3. **`61bc4a8` feat(frontend): 로고 후보 5종 + 프리뷰 페이지 추가** — `frontend/src/assets/logos/` SVG 5종 (Orbit/Signal/Lens/Grid/Peak) + `frontend/public/logo-candidates/index.html` 프리뷰. JPG/PNG 미리보기도 함께.
+
+4. **`3a0a9d4` docs: Stage 2.5-B0 altcoin season 무료 스크래핑 + 로고 후보 + 24h 등락률 반영** — progress.md / checklist.md 갱신.
+
+5. **`0126730` feat(auth): Google OAuth 로그인으로 전환 (매직링크 제거)** — Login.tsx 재작성. `signInWithOAuth({ provider: 'google', queryParams: { prompt: 'select_account' } })` 단일 옵션. Google glyph SVG 인라인. supabase.ts / useAuth.tsx 변경 없음(`persistSession` + `detectSessionInUrl` + `onAuthStateChange`가 OAuth도 동일 처리). 매직링크 흐름 완전 제거.
+
+**Google OAuth 사용자 액션 (미완료 — 직전 검증에서 `Unsupported provider: provider is not enabled` 에러 확인)**
+
+| Step | 위치 | 작업 |
+|---|---|---|
+| 1 | [Supabase Dashboard](https://supabase.com/dashboard/project/plpkmaqyrqkjqnvnqexe/auth/providers) | Google provider 패널의 `Callback URL` 복사 (`https://plpkmaqyrqkjqnvnqexe.supabase.co/auth/v1/callback`) |
+| 2 | [Google Cloud Console](https://console.cloud.google.com/) | OAuth consent screen(External + 본인 이메일 Test users 등록) → Credentials → OAuth client ID(Web application) 발급. Authorized JS origins = `https://crypto-monitoring-one.vercel.app` + `http://localhost:5173`. Authorized redirect URIs = Step 1 Callback URL. Client ID + Secret 복사 |
+| 3 | Supabase Google provider 패널 | `Enable Sign in with Google` 토글 ON + Client IDs / Client Secret 붙여넣기 + `Save` |
+| 4 | 시크릿창 prod URL | `Google로 계속하기` 클릭 → Google 동의 → 자동 로그인 검증 |
+
+직전 검증 — Step 3 토글 OFF 또는 Save 미완으로 추정. 사용자가 다시 시도 중.
+
+**altcoin season 무료 스크래핑 — 동작 원리 요약**
+- 출처 — Blockchaincenter.net (Altcoin Season Index 정의를 만든 원조 사이트)
+- 추출 — 정적 HTML에 `<button>Altcoin Season (<!-- -->27<!-- -->)</button>` 박혀 있어 정규식 2단(1순위 정확 매칭 + 2순위 hydration 주석 변형 흡수) + 본문 "Top 50" false positive 회피
+- 안정성 — 라벨 텍스트 4년+ 변동 없음. cron 일 1회 호출만이라 부하 0. CMC key 발급 시 자동 fallback 2순위로 변환됨
+
+**Stage 2.5 진행률 — 17 / 23 = 73.9%**
+- **status=ok 13** — 도미넌스 + 자체계산 5(Mayer/Pi/RSI22/AHR999/Rainbow) + 온체인 4(Puell/MVRV-Z/NUPL/MVRV) + MSTR 2 + **altcoin_season_index** 1
+- **status=insufficient_data 1** — `two_year_ma_multiple` (730d 필요, 현재 373d, candle-poll 누적으로 자동 활성화)
+- **status=error 2** — ETF flow 2개(`etf_outflow_streak`, `etf_net_flow_btc_mcap_pct`). 직전 cron run에서 Farside 차단 가능성 — 작업 외 별개 진단 항목
+- **보류** — CoinGlass Hobbyist $29/월 / USDT Flexible Savings 스크랩
+
+**다음 할 일 (우선순위 순)**
+1. **Google OAuth 사용자 액션 완료** — Step 1~4. 완료 후 시크릿창에서 `Google로 계속하기` 동작 검증.
+2. **ETF flow status=error 진단** — Farside Cloudflare 차단 여부 확인. `peak_signals` 테이블의 최근 행 `note` 컬럼 또는 워커 로그(`gh run view --log`)에서 원인 파악.
+3. **0009 마이그레이션 적용** — Supabase SQL Editor에서 `worker/migrations/0009_price_change_24h.sql` 실행. price-poll 1회 트리거로 24h 등락률 정상 컬럼 적재 검증.
+4. **two_year_ma_multiple 자동 활성화 관측** — candle-poll 매일 누적 → 약 357일 후 status=ok 전환 예정.
+5. **CMC key 발급 (선택)** — Blockchaincenter fallback이 이미 동작하므로 우선순위 낮음. 발급 시 자동 fallback 우선순위 그대로.
 
 **본 세션 산출**
 - **로고 후보 5종 제작** — `frontend/src/assets/logos/`에 Coinbase Blue `#0052ff` 단색 SVG 워드마크 5종(Orbit/Signal/Lens/Grid/Peak) 추가. 확대 대응을 위해 bitmap이 아닌 벡터로 제작.
