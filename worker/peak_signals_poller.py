@@ -101,9 +101,19 @@ ETF_NET_FLOW_MCAP_RATIO_THRESHOLD = 5.0
 # 호출 시 X-CMC_PRO_API_KEY 헤더 필수. CMC_API_KEY env 없으면 관련 지표 skip.
 CMC_BASE = "https://pro-api.coinmarketcap.com"
 # Altcoin Season Index — checklist 2.5-B0 핵심 지표. 0-100 스케일, ≥75 알트시즌.
-# endpoint 경로는 CMC charts 페이지의 인디케이터에서 추정. 사용자 키 발급 후 실호출로 검증 필요.
+# CMC 공식 docs 확인 완료 — Basic 무료 plan에서 사용 가능. 응답 키는 data.altcoin_index.
 CMC_ALTCOIN_SEASON_PATH = "/v1/altcoin-season-index/latest"
 CMC_ALTCOIN_SEASON_THRESHOLD = 75.0  # 정점 신호 — 알트시즌 진입 (BTC 사이클 후반)
+
+# Altcoin Season Index 원조 사이트 (Blockchaincenter.net). 키 불필요, 정적 HTML에 값 박힘.
+# Next.js SSR로 "Altcoin Season (<!-- -->N<!-- -->)" 형태로 렌더링.
+BLOCKCHAINCENTER_ALTSEASON_URL = "https://www.blockchaincenter.net/altcoin-season-index/"
+# 1순위 — Next.js hydration boundary 주석 포함 정확 매칭.
+# 2순위 — 주석 변형 흡수 (Next.js 버전 업그레이드 대비). 둘 다 본문 "Top 50" 같은 false positive 회피.
+_BLOCKCHAINCENTER_PATTERNS = (
+    re.compile(r"Altcoin Season \(<!-- -->(\d{1,3})<!-- -->\)"),
+    re.compile(r"\bAltcoin Season\s*\(\s*(?:<!--[^>]*-->)?\s*(\d{1,3})"),
+)
 
 _shutdown = False
 
@@ -164,6 +174,40 @@ def fetch_global() -> dict | None:
             time.sleep(wait)
     print(f"[peak] /global fetch failed after {MAX_RETRIES} retries: {last_exc!r}", flush=True)
     return None
+
+
+def fetch_blockchaincenter_altseason() -> tuple[int | None, str | None]:
+    """Blockchaincenter.net 정적 HTML에서 Altcoin Season Index 정수값 추출.
+    성공 시 (value, None), 실패 시 (None, reason)."""
+    last_exc: Exception | None = None
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            with httpx.Client(timeout=HTTP_TIMEOUT_SECONDS, follow_redirects=True) as client:
+                resp = client.get(
+                    BLOCKCHAINCENTER_ALTSEASON_URL,
+                    headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"},
+                )
+                if resp.status_code == 429:
+                    wait = BACKOFF_BASE_SECONDS ** attempt
+                    print(f"[peak] blockchaincenter 429, retry {attempt}/{MAX_RETRIES} in {wait:.0f}s", flush=True)
+                    time.sleep(wait)
+                    continue
+                resp.raise_for_status()
+                html = resp.text
+                for pat in _BLOCKCHAINCENTER_PATTERNS:
+                    m = pat.search(html)
+                    if m:
+                        value = int(m.group(1))
+                        if 0 <= value <= 100:
+                            return value, None
+                        return None, f"value out of range: {value}"
+                return None, "pattern not found in 250kb html"
+        except (httpx.HTTPError, ValueError) as e:
+            last_exc = e
+            wait = BACKOFF_BASE_SECONDS ** attempt
+            print(f"[peak] blockchaincenter error ({e!r}), retry {attempt}/{MAX_RETRIES} in {wait:.0f}s", flush=True)
+            time.sleep(wait)
+    return None, f"fetch failed after {MAX_RETRIES}: {last_exc!r}"
 
 
 def fetch_cmc(path: str, params: dict | None = None) -> dict | None:
@@ -737,39 +781,36 @@ def compute_etf_net_flow_btc_mcap_ratio(
 
 
 def compute_altcoin_season_index(captured_at: str) -> dict:
-    """CMC Altcoin Season Index — 0-100 스케일, ≥75는 알트시즌(사이클 후반).
-    CMC_API_KEY env 없으면 insufficient_data로 적재(사용자에게 누락 표시).
-    endpoint 응답 구조는 키 발급 후 실호출로 검증 필요 — 잘못된 경로면 status=error 적재."""
-    if not os.getenv("CMC_API_KEY", "").strip():
-        return _row(
-            "altcoin_season_index", None, CMC_ALTCOIN_SEASON_THRESHOLD, None, None,
-            source="cmc", status="insufficient_data",
-            note="CMC_API_KEY missing — 사용자 액션 대기 (Pro Basic 무료 plan)",
-            captured_at=captured_at,
-        )
-    data = fetch_cmc(CMC_ALTCOIN_SEASON_PATH)
-    if data is None:
-        return _row(
-            "altcoin_season_index", None, CMC_ALTCOIN_SEASON_THRESHOLD, None, None,
-            source="cmc", status="error",
-            note=f"fetch failed for {CMC_ALTCOIN_SEASON_PATH} — endpoint 검증 필요",
-            captured_at=captured_at,
-        )
-    # 응답 구조 추정 — { value: float, ... } 또는 { altcoin_season_index: float, ... }.
-    # 키 발급 후 실 응답으로 보정. 가능한 키들을 순서대로 시도.
-    raw = data.get("value") or data.get("altcoin_season_index") or data.get("index")
-    try:
-        value = float(raw) if raw is not None else None
-    except (TypeError, ValueError):
-        value = None
+    """Altcoin Season Index — 0-100 스케일, ≥75는 알트시즌(사이클 후반).
+    1순위 원조 Blockchaincenter.net 정적 HTML 스크래핑 (키 불필요).
+    2순위 CMC Pro API (CMC_API_KEY 있을 때만).
+    둘 다 실패 시 status=error."""
+    value, reason = fetch_blockchaincenter_altseason()
+    source = "blockchaincenter"
+
+    if value is None and os.getenv("CMC_API_KEY", "").strip():
+        data = fetch_cmc(CMC_ALTCOIN_SEASON_PATH)
+        if isinstance(data, dict):
+            raw = (data.get("altcoin_index") or data.get("value")
+                   or data.get("altcoin_season_index") or data.get("index"))
+            try:
+                value = float(raw) if raw is not None else None
+            except (TypeError, ValueError):
+                value = None
+            source = "cmc"
+            if value is None:
+                keys = list(data.keys())[:10]
+                reason = f"cmc response keys: {keys}"
+
     if value is None:
-        # 응답이 다른 구조면 raw dict의 키 목록을 note에 남겨 사용자 보정 가능.
-        keys = list(data.keys())[:10] if isinstance(data, dict) else []
         return _row(
             "altcoin_season_index", None, CMC_ALTCOIN_SEASON_THRESHOLD, None, None,
-            source="cmc", status="error",
-            note=f"response keys: {keys}", captured_at=captured_at,
+            source=source, status="error",
+            note=reason or "all sources failed",
+            captured_at=captured_at,
         )
+
+    value = float(value)
     hit = value >= CMC_ALTCOIN_SEASON_THRESHOLD
     progress = min(100.0, max(0.0, (value / CMC_ALTCOIN_SEASON_THRESHOLD) * 100))
     return _row(
@@ -778,7 +819,7 @@ def compute_altcoin_season_index(captured_at: str) -> dict:
         threshold=CMC_ALTCOIN_SEASON_THRESHOLD,
         hit=hit,
         progress_pct=round(progress, 2),
-        source="cmc",
+        source=source,
         status="ok",
         note=None,
         captured_at=captured_at,
