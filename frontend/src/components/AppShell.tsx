@@ -412,6 +412,7 @@ const summaryStyles: Record<string, React.CSSProperties> = {
     gap: '8px',
     paddingRight: '24px',
     borderRight: '1px solid #eef0f3',
+    textAlign: 'center',
   },
   colMeta: {
     display: 'flex',
