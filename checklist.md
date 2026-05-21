@@ -358,6 +358,19 @@
 - [ ] **Step 3** Supabase Google 패널 — `Enable Sign in with Google` 토글 ON + Client IDs 필드(❗`Authorized Client IDs` 아님) + Client Secret + 화면 아래 **Save** 클릭 → `Settings saved` 토스트 확인
 - [ ] **Step 4** 시크릿창 prod URL → `Google로 계속하기` → Google 동의 → 자동 로그인 검증
 
+### 2026-05-21 보안 · Supabase Secret 키 회전 완료 (코드 변경 0, push 0)
+
+- [x] **repo 전체 API 키 노출 스캔** — `git ls-files` 95개 + git history 전체 strict 패턴(`eyJhbGciOi` JWT / `sb_secret` 본문 / `AIza...` / `sk-...` / `ghp_...` / AWS 키) → **0건**. `.env*`/`*.key`/`*.pem`은 gitignore + 디스크에만 + git history 추가 이력 0
+- [x] **워커/프론트 사용 키 형식 진단** — 워커 `SUPABASE_SERVICE_ROLE_KEY=sb_secret_qvsIh...` (NEW) / 프론트 `VITE_SUPABASE_ANON_KEY=sb_publishable_...` (NEW) 모두 라이브 사용 중 확인
+- [x] **새 Secret 키 발급** — Supabase API Keys 페이지 `+ New secret key` → `worker` (`sb_secret_B2PJy...`)
+- [x] **GitHub Actions Secret 업데이트** — repo Settings → Secrets and variables → Actions → `SUPABASE_SERVICE_ROLE_KEY` Update
+- [x] **로컬 `worker/.env` 갱신** — 초기 오타 → `awk` 진단 → 수정 → `grep -c '^SUPABASE_SERVICE_ROLE_KEY=sb_secret_' worker/.env` = `1` 확인
+- [x] **검증 — peak-signals workflow_dispatch run #5** — Success / 56s / poll job 50s. 새 키만으로 워커 정상 동작
+- [x] **옛 Secret 키 Revoke** — `sb_secret_qvsIh...` 폐기. Secret keys 행 1개(`worker`)만 잔존
+- [ ] **(선택, 보류) Publishable 키 회전** — `sb_publishable_Vk89...` 그대로 유지. RLS 보호 공개키라 회전 효용 낮음. 사용자 결정 시 진행
+
+---
+
 ### 2026-05-20 altcoin season 무료 활성화 검증 완료
 - [x] Blockchaincenter HTML 패턴 추출 검증 (로컬 `value=27`)
 - [x] `compute_altcoin_season_index()` 단독 row 출력 검증 (`source=blockchaincenter status=ok value=27 progress=36%`)

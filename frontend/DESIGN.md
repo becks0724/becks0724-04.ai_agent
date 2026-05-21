@@ -691,6 +691,10 @@ negative  bg=#fee2e2 fg=#cf202f   (semantic-down의 lightened)
 - 본 DESIGN.md는 commit `e38895b feat(frontend): Coinbase 디자인 토큰 전면 적용`에 포함되어 origin/main에 처음 올라감(사용자 실행 확인). Vercel webhook 자동 발화로 prod 첫 반영.
 - 본 footer는 그 후 추가 갱신된 부분이므로 다음 docs commit으로 별도 push 필요.
 
+### 2026-05-21 세션 — 디자인 변경 없음
+- 본 세션은 보안 작업(Supabase Secret 키 회전) 단일 트랙. 토큰·컴포넌트·타이포그래피·컬러 변경 0.
+- Coinbase 디자인 시스템(voltage `#0052ff` / pill 100px / xl 24px / Inter + JetBrains Mono / 흰 캔버스) 그대로 유지.
+
 ### 2026-05-20 세션 — 본 세션 디자인 변경
 - **SummaryBox 정렬** — 3 컬럼(총 평가금액 / 총 매수금액 / 손익) label·USD·KRW 모두 `textAlign: 'center'`. `summaryStyles.col` 한 곳 변경. `colMeta`는 별도 스타일이라 영향 없음. commit `4cbef8f`.
 - **Login 디자인 변경** — 매직링크 폼 제거하고 Google OAuth 단일 버튼으로 재구성. 흰 배경 + hairline 1px + radius 100px pill + Google glyph(공식 컬러 5색) + 본문 Inter. Coinbase Blue voltage 규칙 위배 없음(외부 brand mark는 예외 — Google 색은 그대로). commit `0126730`.

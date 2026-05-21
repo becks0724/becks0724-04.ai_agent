@@ -4,7 +4,40 @@
 
 ---
 
-## 현재 상태 (2026-05-20 세션 — **Google OAuth 전환 + altcoin season 무료 활성화 + SummaryBox 정렬 통일**, push 5 commit 완료, 사용자 액션 1건 미완)
+## 현재 상태 (2026-05-21 세션 — **API 키 노출 스캔 + Supabase Secret 키 회전 완료**, 디자인·기능 변경 0)
+
+**한 줄 요약** — 사용자 요청으로 repo 전체 API 키 노출 스캔 → 트랙 파일·git history 노출 0건 확인. 이어서 예방 차원으로 `SUPABASE_SERVICE_ROLE_KEY` 회전 — 새 secret(`worker`) 발급 → GitHub Actions Secret 갱신 → 로컬 `worker/.env` 갱신 → peak-signals workflow_dispatch run #5 success(56s)로 검증 → 옛 `sb_secret_qvsIh...` Revoke 완료. Publishable 키(`sb_publishable_Vk89...`)는 본질적으로 공개키(RLS 보호)라 회전 보류(사용자 결정). 코드 변경 0, push 0.
+
+**본 세션 산출 (코드 push 없음)**
+
+1. **API 키 노출 스캔** — `git ls-files` 95개 트랙 파일 + git history 전체에 대해 `service_role`, `sb_secret`, `eyJhbGciOi` JWT, `AIza...`, `sk-...`, `ghp_...`, AWS 키 패턴 등 strict 매칭 → **모두 0건**. `.env`/`.env.local`/`*.key`/`*.pem`은 `.gitignore` 적용 + 디스크에만 존재 + git history 추가 이력 0건. 결론: repo public 상태에도 실제 secret 노출 없음.
+
+2. **Secret 키 회전 (A 옵션 완료)** —
+   - Supabase API Keys 페이지 우상단 `+ New secret key`로 새 키 `worker`(`sb_secret_B2PJy...`) 발급
+   - GitHub Actions `SUPABASE_SERVICE_ROLE_KEY` Secret을 새 키로 업데이트
+   - 로컬 `worker/.env`의 `SUPABASE_SERVICE_ROLE_KEY=` 값 교체 (초기 오타 → grep 진단 → 수정 → `grep -c '^SUPABASE_SERVICE_ROLE_KEY=sb_secret_' worker/.env` = `1` 확인)
+   - GitHub Actions UI에서 `peak-signals` workflow_dispatch run #5 발화 → Success / 56s / poll job 50s 확인
+   - Supabase에서 옛 `sb_secret_qvsIh...` Revoke 완료 → Secret keys 행 1개(`worker`)만 잔존
+
+3. **Publishable 키 회전 — 보류** — `sb_publishable_Vk89...`는 본질적으로 RLS로 보호되는 공개키. 회전 효용 낮아 사용자 결정 대기.
+
+**미진행 / 보류 (변동 없음)**
+- Google OAuth 사용자 액션 (Supabase Save 단계)
+- ETF flow status=error 진단 (Farside Cloudflare 차단 가능성)
+- 0009 마이그레이션 Supabase SQL Editor 실행
+- two_year_ma_multiple 자동 활성화 관측
+- CoinGlass / USDT Flexible Savings 보류 재평가
+
+**다음 할 일 (우선순위 순)**
+1. **Google OAuth 사용자 액션 완료** — Supabase Authentication > Providers > Google 패널 토글 ON + Client ID/Secret 저장 + Save → 시크릿창 검증
+2. **(선택) Publishable 키 회전** — Vercel `VITE_SUPABASE_ANON_KEY` 갱신 + Redeploy + 옛 publishable 폐기. 약 10분 작업
+3. ETF flow status=error 진단
+4. 0009 마이그레이션 실행
+5. two_year_ma_multiple 자동 활성화 관측
+
+---
+
+## 이전 상태 (2026-05-20 세션 — **Google OAuth 전환 + altcoin season 무료 활성화 + SummaryBox 정렬 통일**, push 5 commit 완료, 사용자 액션 1건 미완)
 
 **한 줄 요약** — 매직링크 로그인을 Google OAuth로 교체(코드 push 완료, 사용자 액션 = Google Cloud OAuth client 발급 + Supabase Authentication > Providers > Google 등록만 남음). altcoin season index를 Blockchaincenter.net 정적 HTML 스크래핑으로 무료 활성화(키 불필요, value=29 로 status=ok 첫 적재). SummaryBox 3 컬럼 모두 가운데 정렬 통일. Coinbase Blue 로고 후보 5종 SVG 벡터 추가. Stage 2.5 진행률 17/23 = 73.9%.
 

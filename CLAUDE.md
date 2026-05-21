@@ -4,7 +4,8 @@
 크립토 포트폴리오 모니터링과 뉴스·지표 대시보드를 제공하는 웹 애플리케이션이다.
 사용자는 수동으로 보유 자산을 입력하고, 실시간 시세·기술적 지표·뉴스 감성을 한 화면에서 확인한다.
 
-## 현재 단계 (2026-05-20 세션 기준)
+## 현재 단계 (2026-05-21 세션 기준)
+- **2026-05-21 보안 작업 — Supabase Secret 키 회전 완료** — repo 전체 API 키 노출 스캔(트랙·history 0건 확인) 후 예방 차원으로 `SUPABASE_SERVICE_ROLE_KEY` 회전. 새 키 `worker`(`sb_secret_B2PJy...`) 발급 → GitHub Actions Secret + 로컬 `worker/.env` 갱신 → peak-signals workflow_dispatch run #5(56s success)로 검증 → 옛 `sb_secret_qvsIh...` Revoke. Publishable 키는 공개키(RLS 보호)라 회전 보류. 코드 변경 0 / push 0.
 - **Stage 0 완료** — Git/스캐폴드/GitHub(`becks0724/becks0724-04.ai_agent` **public**)/Supabase(Singapore)/Vercel(`crypto-monitoring-one.vercel.app`) 검증 완료.
 - **Stage 1 MVP 완료 + 현재가 24h 등락률 구현 중** — `portfolio_holdings`, `price_snapshots`, RLS 4+1, 워커 시세 폴러, 프론트 CRUD 완료. 현재 `price_change_24h_pct` nullable 컬럼용 `0009` 마이그레이션과 CoinGecko `usd_24h_change` 적재/표시 구현. Supabase SQL Editor에서 0009 실행 필요(현재 Supabase는 컬럼 없음, fallback insert 검증 완료).
 - **auth 리팩토링 완료** — `AuthProvider` Context 패턴, signOut/error 노출, env explicit throw.
